@@ -3,20 +3,46 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: MangaGramm API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: users
+    description: User management
+  - name: series
+    description: Manga/Webtoon series
+  - name: chapters
+    description: Chapter management
+  - name: pages
+    description: Page management
+  - name: comments
+    description: Comments
+  - name: likes
+    description: Likes
+  - name: follows
+    description: Follow system
+  - name: favorites
+    description: Favorites/bookmarks
+  - name: genres
+    description: Genre categories
+  - name: discover
+    description: Discovery and trending
+  - name: settings
+    description: User settings
+  - name: notifications
+    description: Notifications
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +50,819 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/register:
+    post:
+      operationId: registerUser
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterBody"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/login:
+    post:
+      operationId: loginUser
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /auth/logout:
+    post:
+      operationId: logoutUser
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /users/{userId}:
+    get:
+      operationId: getUserProfile
+      tags: [users]
+      summary: Get user profile
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /users/{userId}/series:
+    get:
+      operationId: getUserSeries
+      tags: [users]
+      summary: Get series by user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User series
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Series"
+
+  /users/me/update:
+    put:
+      operationId: updateProfile
+      tags: [users]
+      summary: Update own profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileBody"
+      responses:
+        "200":
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /series:
+    get:
+      operationId: listSeries
+      tags: [series]
+      summary: List all series
+      parameters:
+        - name: genre
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ongoing, completed, hiatus]
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [manga, webtoon, comic]
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [latest, popular, trending]
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of series
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesListResponse"
+    post:
+      operationId: createSeries
+      tags: [series]
+      summary: Create a new series
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSeriesBody"
+      responses:
+        "201":
+          description: Series created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Series"
+
+  /series/{seriesId}:
+    get:
+      operationId: getSeries
+      tags: [series]
+      summary: Get series detail
+      parameters:
+        - name: seriesId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Series detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesDetail"
+    put:
+      operationId: updateSeries
+      tags: [series]
+      summary: Update a series
+      parameters:
+        - name: seriesId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSeriesBody"
+      responses:
+        "200":
+          description: Series updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Series"
+    delete:
+      operationId: deleteSeries
+      tags: [series]
+      summary: Delete a series
+      parameters:
+        - name: seriesId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Series deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /series/{seriesId}/chapters:
+    get:
+      operationId: listChapters
+      tags: [chapters]
+      summary: List chapters of a series
+      parameters:
+        - name: seriesId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of chapters
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Chapter"
+    post:
+      operationId: createChapter
+      tags: [chapters]
+      summary: Create a new chapter
+      parameters:
+        - name: seriesId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateChapterBody"
+      responses:
+        "201":
+          description: Chapter created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Chapter"
+
+  /chapters/{chapterId}:
+    get:
+      operationId: getChapter
+      tags: [chapters]
+      summary: Get chapter detail with pages
+      parameters:
+        - name: chapterId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Chapter detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChapterDetail"
+    put:
+      operationId: updateChapter
+      tags: [chapters]
+      summary: Update a chapter
+      parameters:
+        - name: chapterId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateChapterBody"
+      responses:
+        "200":
+          description: Chapter updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Chapter"
+    delete:
+      operationId: deleteChapter
+      tags: [chapters]
+      summary: Delete a chapter
+      parameters:
+        - name: chapterId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Chapter deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /chapters/{chapterId}/pages:
+    post:
+      operationId: addPages
+      tags: [pages]
+      summary: Add pages to a chapter
+      parameters:
+        - name: chapterId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddPagesBody"
+      responses:
+        "201":
+          description: Pages added
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Page"
+
+  /comments:
+    post:
+      operationId: createComment
+      tags: [comments]
+      summary: Post a comment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommentBody"
+      responses:
+        "201":
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+
+  /comments/chapter/{chapterId}:
+    get:
+      operationId: getChapterComments
+      tags: [comments]
+      summary: Get comments for a chapter
+      parameters:
+        - name: chapterId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Chapter comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Comment"
+
+  /comments/{commentId}:
+    delete:
+      operationId: deleteComment
+      tags: [comments]
+      summary: Delete a comment
+      parameters:
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Comment deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /likes/toggle:
+    post:
+      operationId: toggleLike
+      tags: [likes]
+      summary: Toggle like on a series or chapter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ToggleLikeBody"
+      responses:
+        "200":
+          description: Like toggled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LikeResponse"
+
+  /likes/check:
+    get:
+      operationId: checkLike
+      tags: [likes]
+      summary: Check if user liked something
+      parameters:
+        - name: targetType
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [series, chapter]
+        - name: targetId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Like status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LikeResponse"
+
+  /follows/{authorId}:
+    post:
+      operationId: toggleFollow
+      tags: [follows]
+      summary: Toggle follow on an author
+      parameters:
+        - name: authorId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Follow toggled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FollowResponse"
+    get:
+      operationId: checkFollow
+      tags: [follows]
+      summary: Check if following
+      parameters:
+        - name: authorId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Follow status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FollowResponse"
+
+  /follows/me/following:
+    get:
+      operationId: getMyFollowing
+      tags: [follows]
+      summary: Get users I follow
+      responses:
+        "200":
+          description: Following list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserSummary"
+
+  /follows/{userId}/followers:
+    get:
+      operationId: getUserFollowers
+      tags: [follows]
+      summary: Get user followers
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Followers list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserSummary"
+
+  /favorites/toggle:
+    post:
+      operationId: toggleFavorite
+      tags: [favorites]
+      summary: Toggle favorite on a series
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ToggleFavoriteBody"
+      responses:
+        "200":
+          description: Favorite toggled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FavoriteResponse"
+
+  /favorites/me:
+    get:
+      operationId: getMyFavorites
+      tags: [favorites]
+      summary: Get my favorite series
+      responses:
+        "200":
+          description: Favorite series
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Series"
+
+  /favorites/check/{seriesId}:
+    get:
+      operationId: checkFavorite
+      tags: [favorites]
+      summary: Check if series is favorited
+      parameters:
+        - name: seriesId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Favorite status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FavoriteResponse"
+
+  /genres:
+    get:
+      operationId: listGenres
+      tags: [genres]
+      summary: List all genres
+      responses:
+        "200":
+          description: List of genres
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Genre"
+
+  /discover/trending:
+    get:
+      operationId: getTrending
+      tags: [discover]
+      summary: Get trending series
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Trending series
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Series"
+
+  /discover/latest-updates:
+    get:
+      operationId: getLatestUpdates
+      tags: [discover]
+      summary: Get latest chapter updates
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Latest updates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LatestUpdate"
+
+  /discover/top-authors:
+    get:
+      operationId: getTopAuthors
+      tags: [discover]
+      summary: Get top authors by followers
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Top authors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserProfile"
+
+  /discover/stats:
+    get:
+      operationId: getPlatformStats
+      tags: [discover]
+      summary: Platform statistics
+      responses:
+        "200":
+          description: Platform stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformStats"
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get user settings
+      responses:
+        "200":
+          description: User settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSettings"
+    put:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update user settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSettingsBody"
+      responses:
+        "200":
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSettings"
+
+  /notifications:
+    get:
+      operationId: getNotifications
+      tags: [notifications]
+      summary: Get user notifications
+      parameters:
+        - name: unreadOnly
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+
+  /notifications/read-all:
+    post:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications as read
+      responses:
+        "200":
+          description: All marked as read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /notifications/{notificationId}/read:
+    post:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a notification as read
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Marked as read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /reading-history:
+    get:
+      operationId: getReadingHistory
+      tags: [users]
+      summary: Get reading history
+      responses:
+        "200":
+          description: Reading history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReadingHistoryItem"
+
+  /reading-history/{chapterId}:
+    post:
+      operationId: trackReading
+      tags: [users]
+      summary: Track chapter read
+      parameters:
+        - name: chapterId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Reading tracked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +873,791 @@ components:
       required:
         - status
 
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+
+    RegisterBody:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+        displayName:
+          type: string
+        role:
+          type: string
+          enum: [author, reader]
+          default: reader
+        bio:
+          type: string
+      required:
+        - username
+        - email
+        - password
+
+    LoginBody:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+      required:
+        - user
+        - token
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        displayName:
+          type: string
+        avatar:
+          type: string
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [author, reader, admin]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - username
+        - email
+        - role
+        - createdAt
+
+    UserSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        displayName:
+          type: string
+        avatar:
+          type: string
+          nullable: true
+        role:
+          type: string
+      required:
+        - id
+        - username
+        - role
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        displayName:
+          type: string
+        avatar:
+          type: string
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        role:
+          type: string
+        seriesCount:
+          type: integer
+        followersCount:
+          type: integer
+        followingCount:
+          type: integer
+        totalViews:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - username
+        - role
+        - seriesCount
+        - followersCount
+        - followingCount
+        - totalViews
+        - createdAt
+
+    UpdateProfileBody:
+      type: object
+      properties:
+        displayName:
+          type: string
+        bio:
+          type: string
+        avatar:
+          type: string
+
+    Series:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        coverImage:
+          type: string
+          nullable: true
+        bannerImage:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: [manga, webtoon, comic]
+        status:
+          type: string
+          enum: [ongoing, completed, hiatus]
+        genres:
+          type: array
+          items:
+            type: string
+        authorId:
+          type: integer
+        authorName:
+          type: string
+        authorAvatar:
+          type: string
+          nullable: true
+        chapterCount:
+          type: integer
+        viewCount:
+          type: integer
+        likeCount:
+          type: integer
+        favoriteCount:
+          type: integer
+        mature:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - slug
+        - type
+        - status
+        - authorId
+        - authorName
+        - chapterCount
+        - viewCount
+        - likeCount
+        - createdAt
+        - updatedAt
+
+    SeriesDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        coverImage:
+          type: string
+          nullable: true
+        bannerImage:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: [manga, webtoon, comic]
+        status:
+          type: string
+          enum: [ongoing, completed, hiatus]
+        genres:
+          type: array
+          items:
+            type: string
+        authorId:
+          type: integer
+        authorName:
+          type: string
+        authorAvatar:
+          type: string
+          nullable: true
+        chapterCount:
+          type: integer
+        viewCount:
+          type: integer
+        likeCount:
+          type: integer
+        favoriteCount:
+          type: integer
+        mature:
+          type: boolean
+        chapters:
+          type: array
+          items:
+            $ref: "#/components/schemas/Chapter"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - slug
+        - type
+        - status
+        - authorId
+        - authorName
+        - chapterCount
+        - viewCount
+        - likeCount
+        - chapters
+        - createdAt
+        - updatedAt
+
+    SeriesListResponse:
+      type: object
+      properties:
+        series:
+          type: array
+          items:
+            $ref: "#/components/schemas/Series"
+        total:
+          type: integer
+        hasMore:
+          type: boolean
+      required:
+        - series
+        - total
+        - hasMore
+
+    CreateSeriesBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        coverImage:
+          type: string
+        bannerImage:
+          type: string
+        type:
+          type: string
+          enum: [manga, webtoon, comic]
+        status:
+          type: string
+          enum: [ongoing, completed, hiatus]
+          default: ongoing
+        genres:
+          type: array
+          items:
+            type: string
+        mature:
+          type: boolean
+          default: false
+      required:
+        - title
+        - type
+
+    UpdateSeriesBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        coverImage:
+          type: string
+        bannerImage:
+          type: string
+        status:
+          type: string
+          enum: [ongoing, completed, hiatus]
+        genres:
+          type: array
+          items:
+            type: string
+        mature:
+          type: boolean
+
+    Chapter:
+      type: object
+      properties:
+        id:
+          type: integer
+        seriesId:
+          type: integer
+        number:
+          type: number
+        title:
+          type: string
+        pageCount:
+          type: integer
+        viewCount:
+          type: integer
+        likeCount:
+          type: integer
+        commentCount:
+          type: integer
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - seriesId
+        - number
+        - title
+        - pageCount
+        - viewCount
+        - likeCount
+        - commentCount
+        - createdAt
+
+    ChapterDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        seriesId:
+          type: integer
+        seriesTitle:
+          type: string
+        number:
+          type: number
+        title:
+          type: string
+        pages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Page"
+        viewCount:
+          type: integer
+        likeCount:
+          type: integer
+        commentCount:
+          type: integer
+        previousChapterId:
+          type: integer
+          nullable: true
+        nextChapterId:
+          type: integer
+          nullable: true
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - seriesId
+        - seriesTitle
+        - number
+        - title
+        - pages
+        - viewCount
+        - likeCount
+        - commentCount
+        - createdAt
+
+    CreateChapterBody:
+      type: object
+      properties:
+        number:
+          type: number
+        title:
+          type: string
+        published:
+          type: boolean
+          default: true
+      required:
+        - number
+        - title
+
+    UpdateChapterBody:
+      type: object
+      properties:
+        title:
+          type: string
+        published:
+          type: boolean
+
+    Page:
+      type: object
+      properties:
+        id:
+          type: integer
+        chapterId:
+          type: integer
+        pageNumber:
+          type: integer
+        imageUrl:
+          type: string
+        width:
+          type: integer
+        height:
+          type: integer
+      required:
+        - id
+        - chapterId
+        - pageNumber
+        - imageUrl
+
+    AddPagesBody:
+      type: object
+      properties:
+        pages:
+          type: array
+          items:
+            type: object
+            properties:
+              pageNumber:
+                type: integer
+              imageUrl:
+                type: string
+              width:
+                type: integer
+              height:
+                type: integer
+            required:
+              - pageNumber
+              - imageUrl
+      required:
+        - pages
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: integer
+        chapterId:
+          type: integer
+        userId:
+          type: integer
+        username:
+          type: string
+        userAvatar:
+          type: string
+          nullable: true
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - chapterId
+        - userId
+        - username
+        - content
+        - createdAt
+
+    CreateCommentBody:
+      type: object
+      properties:
+        chapterId:
+          type: integer
+        content:
+          type: string
+          minLength: 1
+          maxLength: 2000
+      required:
+        - chapterId
+        - content
+
+    ToggleLikeBody:
+      type: object
+      properties:
+        targetType:
+          type: string
+          enum: [series, chapter]
+        targetId:
+          type: integer
+      required:
+        - targetType
+        - targetId
+
+    LikeResponse:
+      type: object
+      properties:
+        liked:
+          type: boolean
+        likeCount:
+          type: integer
+      required:
+        - liked
+        - likeCount
+
+    FollowResponse:
+      type: object
+      properties:
+        following:
+          type: boolean
+        followersCount:
+          type: integer
+      required:
+        - following
+        - followersCount
+
+    ToggleFavoriteBody:
+      type: object
+      properties:
+        seriesId:
+          type: integer
+      required:
+        - seriesId
+
+    FavoriteResponse:
+      type: object
+      properties:
+        favorited:
+          type: boolean
+        favoriteCount:
+          type: integer
+      required:
+        - favorited
+        - favoriteCount
+
+    Genre:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        seriesCount:
+          type: integer
+      required:
+        - id
+        - name
+        - slug
+        - seriesCount
+
+    LatestUpdate:
+      type: object
+      properties:
+        seriesId:
+          type: integer
+        seriesTitle:
+          type: string
+        seriesCover:
+          type: string
+          nullable: true
+        seriesType:
+          type: string
+        chapterId:
+          type: integer
+        chapterNumber:
+          type: number
+        chapterTitle:
+          type: string
+        authorName:
+          type: string
+        authorAvatar:
+          type: string
+          nullable: true
+        publishedAt:
+          type: string
+          format: date-time
+      required:
+        - seriesId
+        - seriesTitle
+        - seriesType
+        - chapterId
+        - chapterNumber
+        - chapterTitle
+        - authorName
+        - publishedAt
+
+    PlatformStats:
+      type: object
+      properties:
+        totalSeries:
+          type: integer
+        totalChapters:
+          type: integer
+        totalUsers:
+          type: integer
+        totalAuthors:
+          type: integer
+        totalViews:
+          type: integer
+      required:
+        - totalSeries
+        - totalChapters
+        - totalUsers
+        - totalAuthors
+        - totalViews
+
+    UserSettings:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        theme:
+          type: string
+          enum: [light, dark, system]
+        language:
+          type: string
+        emailNotifications:
+          type: boolean
+        pushNotifications:
+          type: boolean
+        matureContent:
+          type: boolean
+        readingDirection:
+          type: string
+          enum: [ltr, rtl]
+        autoNextChapter:
+          type: boolean
+        pageLayout:
+          type: string
+          enum: [single, double, scroll]
+      required:
+        - userId
+        - theme
+        - language
+        - emailNotifications
+        - pushNotifications
+        - matureContent
+        - readingDirection
+        - autoNextChapter
+        - pageLayout
+
+    UpdateSettingsBody:
+      type: object
+      properties:
+        theme:
+          type: string
+          enum: [light, dark, system]
+        language:
+          type: string
+        emailNotifications:
+          type: boolean
+        pushNotifications:
+          type: boolean
+        matureContent:
+          type: boolean
+        readingDirection:
+          type: string
+          enum: [ltr, rtl]
+        autoNextChapter:
+          type: boolean
+        pageLayout:
+          type: string
+          enum: [single, double, scroll]
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        type:
+          type: string
+          enum: [new_chapter, new_follower, like, comment, system]
+        title:
+          type: string
+        message:
+          type: string
+        link:
+          type: string
+          nullable: true
+        read:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - type
+        - title
+        - message
+        - read
+        - createdAt
+
+    ReadingHistoryItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        seriesId:
+          type: integer
+        seriesTitle:
+          type: string
+        seriesCover:
+          type: string
+          nullable: true
+        chapterId:
+          type: integer
+        chapterNumber:
+          type: number
+        chapterTitle:
+          type: string
+        readAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - seriesId
+        - seriesTitle
+        - chapterId
+        - chapterNumber
+        - chapterTitle
+        - readAt

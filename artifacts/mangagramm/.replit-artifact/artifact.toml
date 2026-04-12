@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "MangaGramm"
+version = "1.0.0"
+id = "artifacts/mangagramm"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20934
+
+[services.development]
+run = "pnpm --filter @workspace/mangagramm run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/mangagramm", "run", "build" ]
+publicDir = "artifacts/mangagramm/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20934"
+BASE_PATH = "/"
