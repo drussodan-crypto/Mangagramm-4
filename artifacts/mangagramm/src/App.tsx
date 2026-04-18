@@ -1,3 +1,4 @@
+import "@/lib/i18n";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -18,7 +19,6 @@ import HistoryPage from "@/pages/history";
 import Notifications from "@/pages/notifications";
 import SettingsPage from "@/pages/settings";
 import Login from "@/pages/login";
-import Register from "@/pages/register";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -46,20 +46,8 @@ function Router() {
       <Route path="/notifications" component={Notifications} />
       <Route path="/settings" component={SettingsPage} />
       <Route path="/login" component={Login} />
-      <Route path="/register" component={Register} />
       <Route component={NotFound} />
     </Switch>
-  );
-}
-
-function AppLayout() {
-  return (
-    <>
-      <Navbar />
-      <main>
-        <Router />
-      </main>
-    </>
   );
 }
 
@@ -70,7 +58,10 @@ function App() {
         <AuthProvider>
           <TooltipProvider>
             <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-              <AppLayout />
+              <Navbar />
+              <main>
+                <Router />
+              </main>
             </WouterRouter>
             <Toaster />
           </TooltipProvider>
