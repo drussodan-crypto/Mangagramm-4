@@ -12,3 +12,4 @@ export * from "./settings";
 export * from "./reading-history";
 export * from "./auth";
 export * from "./reactions";
+export * from "./coins";

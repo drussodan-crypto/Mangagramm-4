@@ -118,6 +118,8 @@ router.put("/chapters/:chapterId", requireAuth, async (req, res): Promise<void> 
     updateData.published = parsed.data.published;
     if (parsed.data.published) updateData.publishedAt = new Date();
   }
+  if ((req.body as any).isPremium !== undefined) updateData.isPremium = Boolean((req.body as any).isPremium);
+  if ((req.body as any).coinPrice !== undefined) updateData.coinPrice = parseInt((req.body as any).coinPrice) || 0;
 
   const [updated] = await db.update(chaptersTable).set(updateData).where(eq(chaptersTable.id, chapterId)).returning();
   const [pageCount] = await db.select({ count: sql<number>`count(*)::int` }).from(pagesTable).where(eq(pagesTable.chapterId, chapterId));

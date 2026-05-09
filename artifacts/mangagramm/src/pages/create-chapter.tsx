@@ -7,7 +7,9 @@ import { MultiPageUploader } from "@/components/image-uploader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Lock, Coins } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 function CreateChapterForm() {
@@ -20,6 +22,8 @@ function CreateChapterForm() {
   const [number, setNumber] = useState("");
   const [title, setTitle] = useState("");
   const [pages, setPages] = useState<{ url: string; preview?: string }[]>([]);
+  const [isPremium, setIsPremium] = useState(false);
+  const [coinPrice, setCoinPrice] = useState("5");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: series } = useGetSeries(sId, {
@@ -36,12 +40,17 @@ function CreateChapterForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ number: parseFloat(number), title }),
+        body: JSON.stringify({
+          number: parseFloat(number),
+          title,
+          isPremium,
+          coinPrice: isPremium ? parseInt(coinPrice) || 5 : 0,
+        }),
       });
 
       if (!chapterRes.ok) {
-        const err = await chapterRes.json().catch(() => ({ error: "Failed to create chapter" }));
-        throw new Error(err.error || "Failed to create chapter");
+        const err = await chapterRes.json().catch(() => ({ error: "Erreur lors de la création" }));
+        throw new Error(err.error || "Erreur");
       }
 
       const chapter = await chapterRes.json();
@@ -57,12 +66,10 @@ function CreateChapterForm() {
           }),
         });
 
-        if (!pagesRes.ok) {
-          throw new Error("Failed to add pages");
-        }
+        if (!pagesRes.ok) throw new Error("Erreur lors de l'ajout des pages");
       }
 
-      toast({ title: "Chapitre créé !", description: `Chapitre ${number} "${title}" ajouté.` });
+      toast({ title: "Chapitre créé !", description: `Chapitre ${number} "${title}" ${isPremium ? `— Premium (${coinPrice} Coins)` : ""} ajouté.` });
       setLocation(`/series/${sId}`);
     } catch (err: any) {
       toast({ title: "Erreur", description: err.message, variant: "destructive" });
@@ -89,7 +96,7 @@ function CreateChapterForm() {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="number">Numéro *</Label>
-            <Input id="number" type="number" step="0.5" value={number} onChange={(e) => setNumber(e.target.value)} required data-testid="input-number" />
+            <Input id="number" type="number" step="0.5" min="0" value={number} onChange={(e) => setNumber(e.target.value)} required data-testid="input-number" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="title">Titre *</Label>
@@ -97,13 +104,45 @@ function CreateChapterForm() {
           </div>
         </div>
 
+        <div className="p-4 rounded-xl border border-border bg-card space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Lock className="w-4 h-4 text-yellow-500" />
+              <Label htmlFor="premium-switch" className="cursor-pointer font-medium">Chapitre Premium</Label>
+              {isPremium && <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/20 text-xs">★ Premium</Badge>}
+            </div>
+            <Switch id="premium-switch" checked={isPremium} onCheckedChange={setIsPremium} data-testid="switch-premium" />
+          </div>
+          {isPremium && (
+            <div className="space-y-1.5">
+              <Label className="text-xs flex items-center gap-1"><Coins className="w-3 h-3 text-yellow-500" /> Prix en Coins</Label>
+              <Input
+                type="number"
+                min={1}
+                max={999}
+                value={coinPrice}
+                onChange={(e) => setCoinPrice(e.target.value)}
+                className="w-32"
+                data-testid="input-coin-price"
+              />
+              <p className="text-xs text-muted-foreground">Les lecteurs devront payer {coinPrice || "?"} Coins pour accéder. Vous recevez 70%.</p>
+            </div>
+          )}
+          {!isPremium && (
+            <p className="text-xs text-muted-foreground">Ce chapitre sera gratuit pour tous les lecteurs.</p>
+          )}
+        </div>
+
         <div className="space-y-3">
           <Label>{t("upload_pages")}</Label>
           <MultiPageUploader pages={pages} onPagesChange={setPages} />
+          {pages.length > 0 && (
+            <p className="text-xs text-muted-foreground">{pages.length} page{pages.length > 1 ? "s" : ""} sélectionnée{pages.length > 1 ? "s" : ""}</p>
+          )}
         </div>
 
         <Button type="submit" className="w-full" disabled={isSubmitting || !number || !title} data-testid="button-submit-chapter">
-          {isSubmitting ? "Création..." : t("add_chapter")}
+          {isSubmitting ? "Création en cours..." : t("add_chapter")}
         </Button>
       </form>
     </div>

@@ -9,6 +9,8 @@ export const chaptersTable = pgTable("chapters", {
   number: doublePrecision("number").notNull(),
   title: text("title").notNull(),
   published: boolean("published").notNull().default(true),
+  isPremium: boolean("is_premium").notNull().default(false),
+  coinPrice: integer("coin_price").notNull().default(0),
   viewCount: integer("view_count").notNull().default(0),
   likeCount: integer("like_count").notNull().default(0),
   commentCount: integer("comment_count").notNull().default(0),

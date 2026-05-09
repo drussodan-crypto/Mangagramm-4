@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, pgEnum, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -14,6 +14,13 @@ export const usersTable = pgTable("users", {
   avatar: text("avatar"),
   bio: text("bio"),
   role: userRoleEnum("role").notNull().default("reader"),
+  xp: integer("xp").notNull().default(0),
+  coins: integer("coins").notNull().default(0),
+  earnedCoins: integer("earned_coins").notNull().default(0),
+  classLevel: integer("class_level").notNull().default(4),
+  lastReadAt: timestamp("last_read_at"),
+  payoutNumber: text("payout_number"),
+  payoutMethod: text("payout_method").default("mtn"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

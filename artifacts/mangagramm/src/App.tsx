@@ -19,6 +19,8 @@ import HistoryPage from "@/pages/history";
 import Notifications from "@/pages/notifications";
 import SettingsPage from "@/pages/settings";
 import Login from "@/pages/login";
+import CoinsPage from "@/pages/coins";
+import PayoutsPage from "@/pages/payouts";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -45,6 +47,8 @@ function Router() {
       <Route path="/history" component={HistoryPage} />
       <Route path="/notifications" component={Notifications} />
       <Route path="/settings" component={SettingsPage} />
+      <Route path="/coins" component={CoinsPage} />
+      <Route path="/payouts" component={PayoutsPage} />
       <Route path="/login" component={Login} />
       <Route component={NotFound} />
     </Switch>

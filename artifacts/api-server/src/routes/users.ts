@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, sql } from "drizzle-orm";
-import { db, usersTable, seriesTable, followsTable } from "@workspace/db";
+import { db, usersTable, seriesTable, followsTable, chaptersTable, pagesTable } from "@workspace/db";
 import { UpdateProfileBody } from "@workspace/api-zod";
 import { requireAuth } from "../lib/auth";
 
@@ -72,6 +72,35 @@ router.put("/users/me/update", requireAuth, async (req, res): Promise<void> => {
   const [user] = await db.update(usersTable).set(updateData).where(eq(usersTable.id, req.session.userId!)).returning();
   const { password: _, ...userWithoutPassword } = user;
   res.json(userWithoutPassword);
+});
+
+router.get("/users/:userId/chapters", async (req, res): Promise<void> => {
+  const userId = parseInt(Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId, 10);
+  if (isNaN(userId)) { res.status(400).json({ error: "Invalid user ID" }); return; }
+
+  const rows = await db.execute(
+    sql.raw(`
+      SELECT c.*, s.title as series_title
+      FROM chapters c
+      JOIN series s ON s.id = c.series_id
+      WHERE s.author_id = ${userId}
+      ORDER BY c.published_at DESC NULLS LAST
+      LIMIT 100
+    `)
+  );
+
+  res.json((rows as any).rows?.map((r: any) => ({
+    id: r.id,
+    number: r.number,
+    title: r.title,
+    seriesTitle: r.series_title,
+    seriesId: r.series_id,
+    viewCount: r.view_count,
+    isPremium: r.is_premium,
+    coinPrice: r.coin_price,
+    publishedAt: r.published_at,
+    createdAt: r.created_at,
+  })) || []);
 });
 
 export default router;

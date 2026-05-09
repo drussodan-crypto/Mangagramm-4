@@ -10,6 +10,10 @@ import discoverRouter from "./discover";
 import settingsRouter from "./settings";
 import reactionsRouter from "./reactions";
 import storageRouter from "./storage";
+import xpRouter from "./xp";
+import paymentsRouter from "./payments";
+import payoutsRouter from "./payouts";
+import readingHistoryRouter from "./reading-history";
 
 const router: IRouter = Router();
 
@@ -24,5 +28,9 @@ router.use(discoverRouter);
 router.use(settingsRouter);
 router.use(reactionsRouter);
 router.use(storageRouter);
+router.use(xpRouter);
+router.use(readingHistoryRouter);
+router.use(paymentsRouter);
+router.use(payoutsRouter);
 
 export default router;
