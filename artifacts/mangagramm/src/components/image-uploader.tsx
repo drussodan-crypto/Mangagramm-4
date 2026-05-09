@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
+import { Upload, X, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ImageUploaderProps {
@@ -21,13 +21,12 @@ export function ImageUploader({ label, currentUrl, onUpload, aspect = "cover", a
 
   const handleFileSelect = async (file: File) => {
     if (!file.type.startsWith("image/")) {
-      setError("Please select an image file");
+      setError("Veuillez sélectionner une image");
       return;
     }
-
     const maxSize = 20 * 1024 * 1024;
     if (file.size > maxSize) {
-      setError("File size must be under 20MB");
+      setError("Taille max : 20 Mo");
       return;
     }
 
@@ -45,8 +44,7 @@ export function ImageUploader({ label, currentUrl, onUpload, aspect = "cover", a
         credentials: "include",
         body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
       });
-
-      if (!metaRes.ok) throw new Error("Failed to get upload URL");
+      if (!metaRes.ok) throw new Error("Impossible d'obtenir l'URL d'upload");
       const { uploadURL, objectPath } = await metaRes.json();
 
       await new Promise<void>((resolve, reject) => {
@@ -58,47 +56,43 @@ export function ImageUploader({ label, currentUrl, onUpload, aspect = "cover", a
           if (xhr.status >= 200 && xhr.status < 300) resolve();
           else reject(new Error(`Upload failed: ${xhr.status}`));
         });
-        xhr.addEventListener("error", () => reject(new Error("Upload failed")));
+        xhr.addEventListener("error", () => reject(new Error("Erreur réseau")));
         xhr.open("PUT", uploadURL);
         xhr.setRequestHeader("Content-Type", file.type);
         xhr.send(file);
       });
 
       const servingPath = `/api/storage${objectPath}`;
+      setPreview(servingPath);
       onUpload(servingPath, servingPath);
-      setProgress(100);
     } catch (err) {
-      setError("Upload failed. Please try again.");
-      setPreview(currentUrl || null);
-      console.error("Upload error:", err);
+      setError("Échec de l'upload");
+      setPreview(null);
+      onUpload("", "");
     } finally {
       setIsUploading(false);
+      setProgress(0);
     }
   };
 
-  const aspectClasses = {
-    cover: "aspect-[3/4] max-w-[160px]",
-    page: "aspect-[2/3] max-w-full",
-    avatar: "aspect-square max-w-[120px] rounded-full",
-  };
+  const aspectClass = aspect === "avatar" ? "aspect-square" : aspect === "page" ? "aspect-[2/3]" : "aspect-[3/4]";
 
   return (
     <div className="space-y-2">
       {label && <p className="text-sm font-medium">{label}</p>}
-
       <div
-        className={`relative ${aspectClasses[aspect]} rounded-lg overflow-hidden border-2 border-dashed border-border hover:border-foreground/40 transition-colors bg-muted cursor-pointer group`}
+        className={`relative ${aspectClass} rounded-lg border-2 border-dashed border-border bg-muted cursor-pointer overflow-hidden transition-colors hover:border-foreground/40`}
         onClick={() => !isUploading && inputRef.current?.click()}
+        data-testid="button-image-upload"
       >
         {preview ? (
           <>
-            <img src={preview} alt="Preview" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <div className="text-white text-center">
-                <ImageIcon className="w-6 h-6 mx-auto mb-1" />
-                <p className="text-xs">{t("select_from_gallery")}</p>
+            <img src={preview} alt="Aperçu" className="w-full h-full object-cover" />
+            {isUploading && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-white" />
               </div>
-            </div>
+            )}
             {!isUploading && (
               <button
                 className="absolute top-2 right-2 p-1 bg-black/60 rounded-full text-white hover:bg-black/80 transition-colors"
@@ -124,10 +118,7 @@ export function ImageUploader({ label, currentUrl, onUpload, aspect = "cover", a
 
         {isUploading && (
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted">
-            <div
-              className="h-full bg-foreground transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
+            <div className="h-full bg-foreground transition-all duration-300" style={{ width: `${progress}%` }} />
           </div>
         )}
       </div>
@@ -144,12 +135,15 @@ export function ImageUploader({ label, currentUrl, onUpload, aspect = "cover", a
         }}
         data-testid="input-file-upload"
       />
-
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }
 
+/* ─── MultiPageUploader ─────────────────────────────────────────
+   Bug fix: stale closure — uploadFile captured stale `pages` prop.
+   Fix: pagesRef always mirrors latest pages synchronously.
+──────────────────────────────────────────────────────────────── */
 interface MultiPageUploaderProps {
   pages: { url: string; preview?: string }[];
   onPagesChange: (pages: { url: string; preview?: string }[]) => void;
@@ -159,10 +153,15 @@ export function MultiPageUploader({ pages, onPagesChange }: MultiPageUploaderPro
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState<Set<number>>(new Set());
+  const [errors, setErrors] = useState<Record<number, string>>({});
+
+  // ✅ Always mirrors latest pages — fixes stale closure bug
+  const pagesRef = useRef(pages);
+  pagesRef.current = pages;
 
   const uploadFile = async (file: File, index: number) => {
     setUploading((prev) => new Set(prev).add(index));
-    const localPreview = URL.createObjectURL(file);
+    setErrors((prev) => { const e = { ...prev }; delete e[index]; return e; });
 
     try {
       const metaRes = await fetch("/api/storage/uploads/request-url", {
@@ -171,86 +170,143 @@ export function MultiPageUploader({ pages, onPagesChange }: MultiPageUploaderPro
         credentials: "include",
         body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
       });
-      if (!metaRes.ok) throw new Error("Failed to get upload URL");
+      if (!metaRes.ok) throw new Error("URL d'upload introuvable");
       const { uploadURL, objectPath } = await metaRes.json();
 
-      await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
 
       const servingPath = `/api/storage${objectPath}`;
-      const newPages = [...pages];
+
+      // ✅ Read from ref (latest pages), not stale closure
+      const newPages = [...pagesRef.current];
       newPages[index] = { url: servingPath, preview: servingPath };
       onPagesChange(newPages);
     } catch (err) {
-      console.error("Page upload failed:", err);
-      const newPages = [...pages];
-      newPages[index] = { url: "", preview: localPreview };
+      setErrors((prev) => ({ ...prev, [index]: "Échec" }));
+      // Keep placeholder but mark as failed
+      const newPages = [...pagesRef.current];
+      newPages[index] = { url: "", preview: "" };
       onPagesChange(newPages);
     } finally {
       setUploading((prev) => { const s = new Set(prev); s.delete(index); return s; });
     }
   };
 
-  const handleFilesSelected = async (files: FileList) => {
+  const handleFilesSelected = (files: FileList) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
-    const startIndex = pages.length;
-    const newPages = [...pages, ...imageFiles.map(() => ({ url: "" }))];
-    onPagesChange(newPages);
+    if (imageFiles.length === 0) return;
 
-    for (let i = 0; i < imageFiles.length; i++) {
-      uploadFile(imageFiles[i], startIndex + i);
-    }
+    const startIndex = pagesRef.current.length;
+    // Add placeholders immediately so the UI shows the incoming pages
+    const withPlaceholders = [...pagesRef.current, ...imageFiles.map(() => ({ url: "" }))];
+    onPagesChange(withPlaceholders);
+
+    // Start all uploads in parallel — each reads from pagesRef (always current)
+    imageFiles.forEach((file, i) => uploadFile(file, startIndex + i));
   };
 
   const removePage = (index: number) => {
-    const newPages = pages.filter((_, i) => i !== index);
-    onPagesChange(newPages);
+    onPagesChange(pagesRef.current.filter((_, i) => i !== index));
   };
 
   const movePage = (from: number, to: number) => {
-    const newPages = [...pages];
+    const newPages = [...pagesRef.current];
     const [moved] = newPages.splice(from, 1);
     newPages.splice(to, 0, moved);
     onPagesChange(newPages);
   };
 
+  const uploadingCount = uploading.size;
+
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+      {/* Status bar */}
+      {uploadingCount > 0 && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted rounded-lg px-3 py-2">
+          <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+          <span>Upload en cours : {uploadingCount} image{uploadingCount > 1 ? "s" : ""}…</span>
+        </div>
+      )}
+
+      {/* Page thumbnails grid */}
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
         {pages.map((page, i) => (
-          <div key={i} className="relative group">
-            <div className="aspect-[2/3] rounded bg-muted overflow-hidden border border-border">
+          <div key={i} className="relative group" data-testid={`page-thumb-${i}`}>
+            <div className="aspect-[2/3] rounded-lg bg-muted overflow-hidden border border-border">
               {uploading.has(i) ? (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                <div className="w-full h-full flex flex-col items-center justify-center gap-1">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  <span className="text-[10px] text-muted-foreground">Upload…</span>
+                </div>
+              ) : errors[i] ? (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-1 bg-destructive/10">
+                  <X className="w-5 h-5 text-destructive" />
+                  <span className="text-[10px] text-destructive">Erreur</span>
                 </div>
               ) : page.preview || page.url ? (
-                <img src={page.preview || page.url} alt={`Page ${i + 1}`} className="w-full h-full object-cover" />
+                <img
+                  src={page.preview || page.url}
+                  alt={`Page ${i + 1}`}
+                  className="w-full h-full object-cover"
+                />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-xs text-muted-foreground">{i + 1}</span>
+                  <ImageIcon className="w-5 h-5 text-muted-foreground/40" />
                 </div>
               )}
             </div>
-            <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 flex gap-1">
-              <button
-                onClick={() => removePage(i)}
-                className="p-1 bg-black/60 rounded-full text-white text-xs"
-                data-testid={`button-remove-page-${i}`}
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-            <span className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white rounded px-1">{i + 1}</span>
+
+            {/* Page number badge */}
+            <span className="absolute bottom-1 left-1 text-[10px] bg-black/70 text-white rounded px-1 leading-tight">
+              {i + 1}
+            </span>
+
+            {/* Controls — always visible on mobile, hover on desktop */}
+            {!uploading.has(i) && (
+              <div className="absolute top-1 right-1 flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 sm:transition-opacity">
+                {i > 0 && (
+                  <button
+                    onClick={() => movePage(i, i - 1)}
+                    className="p-0.5 bg-black/70 rounded text-white hover:bg-black/90"
+                    title="Monter"
+                  >
+                    <ChevronLeft className="w-3 h-3" />
+                  </button>
+                )}
+                {i < pages.length - 1 && (
+                  <button
+                    onClick={() => movePage(i, i + 1)}
+                    className="p-0.5 bg-black/70 rounded text-white hover:bg-black/90"
+                    title="Descendre"
+                  >
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
+                )}
+                <button
+                  onClick={() => removePage(i)}
+                  className="p-0.5 bg-black/70 rounded text-white hover:bg-red-600"
+                  title="Supprimer"
+                  data-testid={`button-remove-page-${i}`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
           </div>
         ))}
 
+        {/* Add more button */}
         <div
-          className="aspect-[2/3] rounded border-2 border-dashed border-border flex flex-col items-center justify-center text-muted-foreground cursor-pointer hover:border-foreground/40 hover:bg-accent/30 transition-colors"
+          className="aspect-[2/3] rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center text-muted-foreground cursor-pointer hover:border-foreground/40 hover:bg-accent/30 transition-colors"
           onClick={() => inputRef.current?.click()}
           data-testid="button-add-pages"
         >
-          <Upload className="w-6 h-6 mb-1" />
-          <span className="text-[10px] text-center px-1">{t("select_from_gallery")}</span>
+          <Upload className="w-5 h-5 mb-1" />
+          <span className="text-[9px] text-center px-1 leading-tight">{t("select_from_gallery")}</span>
         </div>
       </div>
 
@@ -260,12 +316,18 @@ export function MultiPageUploader({ pages, onPagesChange }: MultiPageUploaderPro
         accept="image/*"
         multiple
         className="hidden"
-        onChange={(e) => { if (e.target.files?.length) handleFilesSelected(e.target.files); e.target.value = ""; }}
+        onChange={(e) => {
+          if (e.target.files?.length) handleFilesSelected(e.target.files);
+          e.target.value = "";
+        }}
         data-testid="input-pages-file"
       />
 
       {pages.length > 0 && (
-        <p className="text-xs text-muted-foreground">{pages.length} page{pages.length > 1 ? "s" : ""} sélectionnée{pages.length > 1 ? "s" : ""}</p>
+        <p className="text-xs text-muted-foreground">
+          {pages.filter(p => p.url).length}/{pages.length} page{pages.length > 1 ? "s" : ""} prête{pages.filter(p => p.url).length > 1 ? "s" : ""}
+          {uploadingCount > 0 && <span className="text-yellow-500 ml-1"> (upload en cours…)</span>}
+        </p>
       )}
     </div>
   );
