@@ -356,16 +356,23 @@ export default function Reader() {
           </div>
         )}
 
-        {/* ── COMMENTS ── */}
+        {/* ── COMMENTS — visible to all, post requires auth ── */}
         {showComments && !needsUnlock && (
           <div className="px-4 pb-8 max-w-2xl mx-auto border-t border-white/10 pt-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white">Commentaires</h3>
+              <h3 className="text-lg font-semibold text-white">
+                Commentaires
+                {Array.isArray(comments) && comments.length > 0 && (
+                  <span className="ml-2 text-sm font-normal text-gray-400">({comments.length})</span>
+                )}
+              </h3>
               <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-400" onClick={() => setShowComments(false)}>
                 <X className="w-4 h-4" />
               </Button>
             </div>
-            {isAuthenticated && (
+
+            {/* Post box — auth required */}
+            {isAuthenticated ? (
               <div className="flex gap-2 mb-6">
                 <Textarea
                   placeholder="Écrire un commentaire..."
@@ -378,7 +385,16 @@ export default function Reader() {
                   Poster
                 </Button>
               </div>
+            ) : (
+              <div className="mb-6 p-3 rounded-lg bg-white/5 border border-white/10 text-center">
+                <p className="text-sm text-gray-400 mb-2">Connectez-vous pour laisser un commentaire</p>
+                <Button size="sm" variant="outline" onClick={() => setLocation("/login")} className="border-white/20 text-white hover:bg-white/10">
+                  Se connecter
+                </Button>
+              </div>
             )}
+
+            {/* Comments list — visible to everyone */}
             <div className="space-y-4">
               {(comments as any[])?.map((cm: any) => (
                 <div key={cm.id} className="flex gap-3" data-testid={`comment-${cm.id}`}>
@@ -387,17 +403,20 @@ export default function Reader() {
                       {(cm.username || "?").charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
-                    <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-medium text-white">{cm.username}</span>
                       <span className="text-xs text-gray-500">{new Date(cm.createdAt).toLocaleDateString("fr-FR")}</span>
                     </div>
-                    <p className="text-sm mt-0.5 text-gray-300">{cm.content}</p>
+                    <p className="text-sm mt-0.5 text-gray-300 break-words">{cm.content}</p>
                   </div>
                 </div>
               ))}
               {(!comments || (comments as any[]).length === 0) && (
-                <p className="text-sm text-gray-500 text-center py-4">Aucun commentaire.</p>
+                <div className="text-center py-8">
+                  <MessageCircle className="w-8 h-8 mx-auto mb-2 text-gray-700" />
+                  <p className="text-sm text-gray-500">Soyez le premier à commenter !</p>
+                </div>
               )}
             </div>
           </div>

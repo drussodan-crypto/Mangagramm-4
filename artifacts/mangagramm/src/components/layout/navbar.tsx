@@ -59,7 +59,7 @@ export function Navbar() {
         {/* ── LOGO ── */}
         <Link href="/" className="flex items-center gap-2 shrink-0 group">
           <BrushLogo className="w-6 h-9 text-foreground transition-transform group-hover:rotate-[-6deg]" />
-          <span className="font-serif text-xl font-bold tracking-tight hidden sm:inline">MangaGramm</span>
+          <span className="font-serif text-xl font-bold tracking-tight">MangaGramm</span>
         </Link>
 
         {/* ── NAV LINKS ── */}

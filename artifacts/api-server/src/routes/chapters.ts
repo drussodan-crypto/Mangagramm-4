@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, sql, asc, and, gt, lt } from "drizzle-orm";
+import { eq, sql, asc, desc, and, gt, lt } from "drizzle-orm";
 import { db, chaptersTable, pagesTable, seriesTable } from "@workspace/db";
 import { CreateChapterBody, UpdateChapterBody, AddPagesBody } from "@workspace/api-zod";
 import { requireAuth } from "../lib/auth";
@@ -75,7 +75,7 @@ router.get("/chapters/:chapterId", async (req, res): Promise<void> => {
 
   const [prevChapter] = await db.select({ id: chaptersTable.id }).from(chaptersTable)
     .where(and(eq(chaptersTable.seriesId, chapter.seriesId), lt(chaptersTable.number, chapter.number)))
-    .orderBy(asc(chaptersTable.number))
+    .orderBy(desc(chaptersTable.number))
     .limit(1);
 
   const [nextChapter] = await db.select({ id: chaptersTable.id }).from(chaptersTable)
