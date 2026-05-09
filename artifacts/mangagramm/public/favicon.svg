@@ -1,3 +1,19 @@
-<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="180" height="180" rx="36" fill="#FF3C00"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Handle -->
+  <rect x="27" y="3" width="10" height="28" rx="5" fill="#1a1a1a"/>
+  <!-- Grip lines -->
+  <rect x="27" y="10" width="10" height="2" rx="1" fill="#333"/>
+  <rect x="27" y="15" width="10" height="2" rx="1" fill="#333"/>
+  <rect x="27" y="20" width="10" height="2" rx="1" fill="#333"/>
+  <!-- Ferrule (metal band) -->
+  <rect x="25" y="29" width="14" height="7" rx="2" fill="#aaa"/>
+  <rect x="25" y="29" width="14" height="2.5" rx="1" fill="#ccc"/>
+  <!-- Bristle base -->
+  <path d="M25 36 L39 36 L37 44 L27 44 Z" fill="#111"/>
+  <!-- Bristle tip -->
+  <path d="M27 44 Q32 62 32 62 Q32 62 37 44 Z" fill="#111"/>
+  <!-- Ink drop highlight -->
+  <ellipse cx="32" cy="55" rx="2.5" ry="4" fill="#333" opacity="0.5"/>
+  <!-- Handle highlight -->
+  <rect x="29" y="5" width="3" height="20" rx="1.5" fill="#555" opacity="0.5"/>
 </svg>

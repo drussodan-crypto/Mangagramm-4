@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Bookmark, Eye, BookOpen, UserPlus, UserCheck, PenTool } from "lucide-react";
+import { Bookmark, Eye, BookOpen, UserPlus, UserCheck, PenTool, Trash2, Lock, Coins } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SeriesDetail() {
   const { id } = useParams<{ id: string }>();
@@ -17,10 +18,12 @@ export default function SeriesDetail() {
   const { user, isAuthenticated } = useAuth();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const [reactionData, setReactionData] = useState<{ total: number; counts: Record<string, number>; myReaction: string | null }>({
     total: 0, counts: {}, myReaction: null,
   });
+  const [deletingChapterId, setDeletingChapterId] = useState<number | null>(null);
 
   const { data: series, isLoading } = useGetSeries(seriesId, {
     query: { enabled: !!seriesId, queryKey: getGetSeriesQueryKey(seriesId) },
@@ -65,9 +68,7 @@ export default function SeriesDetail() {
         setReactionData({ total: data.total, counts: data.counts, myReaction: data.myReaction });
         queryClient.invalidateQueries({ queryKey: getGetSeriesQueryKey(seriesId) });
       }
-    } catch (err) {
-      console.error("Reaction error:", err);
-    }
+    } catch {}
   }, [seriesId, queryClient]);
 
   const handleFavorite = () => {
@@ -84,6 +85,27 @@ export default function SeriesDetail() {
     });
   };
 
+  const handleDeleteChapter = async (chapterId: number, chapterTitle: string) => {
+    if (!confirm(`Supprimer "${chapterTitle}" définitivement ? Cette action est irréversible.`)) return;
+    setDeletingChapterId(chapterId);
+    try {
+      const res = await fetch(`/api/chapters/${chapterId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (res.ok) {
+        toast({ title: "Chapitre supprimé", description: `"${chapterTitle}" a été supprimé.` });
+        queryClient.invalidateQueries({ queryKey: getGetSeriesQueryKey(seriesId) });
+      } else {
+        toast({ title: "Erreur", description: "Impossible de supprimer ce chapitre.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Erreur réseau", variant: "destructive" });
+    } finally {
+      setDeletingChapterId(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
@@ -97,7 +119,7 @@ export default function SeriesDetail() {
   if (!series) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-20 text-center text-muted-foreground">
-        <p className="text-lg">Series not found</p>
+        <p className="text-lg">Série introuvable</p>
       </div>
     );
   }
@@ -106,10 +128,12 @@ export default function SeriesDetail() {
   const chapters = s.chapters || [];
   const isFollowing = (followStatus as any)?.following;
   const isFavorited = (favStatus as any)?.favorited;
+  const isAuthor = isAuthenticated && user?.id === s.authorId;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8" data-testid="page-series-detail">
       <div className="flex flex-col md:flex-row gap-6 mb-8">
+        {/* Cover */}
         <div className="w-44 shrink-0">
           <div className="aspect-[3/4] rounded-lg overflow-hidden bg-muted border border-border">
             {s.coverImage ? (
@@ -122,9 +146,10 @@ export default function SeriesDetail() {
           </div>
         </div>
 
+        {/* Info */}
         <div className="flex-1 space-y-4">
           <div>
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
               <Badge variant="secondary">{s.type}</Badge>
               <Badge variant={s.status === "completed" ? "default" : "secondary"}>{s.status}</Badge>
               {s.mature && <Badge variant="destructive">18+</Badge>}
@@ -132,7 +157,7 @@ export default function SeriesDetail() {
             <h1 className="text-2xl font-serif font-bold">{s.title}</h1>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <Link href={`/profile/${s.authorId}`}>
               <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
                 <Avatar className="h-8 w-8">
@@ -144,12 +169,12 @@ export default function SeriesDetail() {
                 <span className="text-sm font-medium">{s.authorName}</span>
               </div>
             </Link>
-            {isAuthenticated && user?.id !== s.authorId && (
+            {isAuthenticated && !isAuthor && (
               <Button size="sm" variant={isFollowing ? "secondary" : "outline"} onClick={handleFollow} className="h-7 text-xs" data-testid="button-follow">
                 {isFollowing ? <><UserCheck className="w-3 h-3 mr-1" /> {t("following")}</> : <><UserPlus className="w-3 h-3 mr-1" /> {t("follow")}</>}
               </Button>
             )}
-            {isAuthenticated && user?.id === s.authorId && (
+            {isAuthor && (
               <Link href={`/create/${seriesId}/chapter`}>
                 <Button size="sm" variant="outline" className="h-7 text-xs gap-1" data-testid="button-add-chapter">
                   <PenTool className="w-3 h-3" /> {t("add_chapter")}
@@ -202,25 +227,66 @@ export default function SeriesDetail() {
         </div>
       </div>
 
+      {/* Chapter list */}
       <div>
-        <h2 className="text-lg font-semibold mb-4">{t("chapters")} ({chapters.length})</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">{t("chapters")} ({chapters.length})</h2>
+          {isAuthor && chapters.length > 0 && (
+            <span className="text-xs text-muted-foreground">✏️ Maintenez pour modifier · 🗑️ pour supprimer</span>
+          )}
+        </div>
         {chapters.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">{t("no_chapters")}</p>
         ) : (
           <div className="space-y-1">
             {chapters.map((c: any) => (
-              <Link key={c.id} href={`/read/${c.id}`} data-testid={`chapter-${c.id}`}>
-                <div className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium w-16">Ch. {c.number}</span>
-                    <span className="text-sm">{c.title}</span>
+              <div key={c.id} className="flex items-center gap-2 group" data-testid={`chapter-row-${c.id}`}>
+                <Link href={`/read/${c.id}`} className="flex-1" data-testid={`chapter-${c.id}`}>
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors cursor-pointer">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-sm font-medium w-14 shrink-0 text-muted-foreground">Ch.{c.number}</span>
+                      <span className="text-sm truncate">{c.title}</span>
+                      {c.isPremium && (
+                        <Badge className="text-[10px] bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border-yellow-500/20 shrink-0 gap-0.5">
+                          <Lock className="w-2.5 h-2.5" />{c.coinPrice}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+                      <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> {c.viewCount}</span>
+                      <span className="hidden sm:inline">{c.publishedAt ? new Date(c.publishedAt).toLocaleDateString("fr-FR") : ""}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> {c.viewCount}</span>
-                    <span>{c.publishedAt ? new Date(c.publishedAt).toLocaleDateString() : ""}</span>
+                </Link>
+
+                {/* Author controls */}
+                {isAuthor && (
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    <Link href={`/create/${seriesId}/chapter`}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                        title="Modifier ce chapitre"
+                        data-testid={`button-edit-chapter-${c.id}`}
+                      >
+                        <PenTool className="w-3.5 h-3.5" />
+                      </Button>
+                    </Link>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => handleDeleteChapter(c.id, c.title)}
+                      disabled={deletingChapterId === c.id}
+                      title="Supprimer ce chapitre"
+                      data-testid={`button-delete-chapter-${c.id}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
                   </div>
-                </div>
-              </Link>
+                )}
+              </div>
             ))}
           </div>
         )}

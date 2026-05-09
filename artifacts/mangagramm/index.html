@@ -1,13 +1,62 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>MangaGramm</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5" />
+
+    <!-- Primary SEO -->
+    <title>MangaGramm — Lire et publier des mangas, webtoons et comics</title>
+    <meta name="description" content="MangaGramm est la plateforme de manga, webtoon et comics francophone. Lisez gratuitement, soutenez les auteurs, publiez vos créations. Rejoignez la communauté !" />
+    <meta name="keywords" content="manga, webtoon, comics, lecture manga, MangaGramm, manga francophone, publier manga, bande dessinée, manhwa, manhua" />
+    <meta name="author" content="MangaGramm" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://mangaGramm.com" />
+
+    <!-- Open Graph (Facebook, WhatsApp, etc.) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://mangaGramm.com" />
+    <meta property="og:title" content="MangaGramm — Lire et publier des mangas" />
+    <meta property="og:description" content="Découvrez des milliers de mangas, webtoons et comics. Lisez gratuitement ou soutenez les auteurs avec des Coins. Publiez vos propres créations !" />
+    <meta property="og:image" content="https://mangaGramm.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="fr_FR" />
+    <meta property="og:site_name" content="MangaGramm" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="MangaGramm — Lire et publier des mangas" />
+    <meta name="twitter:description" content="La plateforme de manga francophone. Lisez gratuitement, publiez vos créations, rejoignez la communauté." />
+    <meta name="twitter:image" content="https://mangaGramm.com/og-image.png" />
+
+    <!-- Schema.org structured data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "MangaGramm",
+      "url": "https://mangaGramm.com",
+      "description": "Plateforme de lecture et publication de manga, webtoon et comics",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://mangaGramm.com/browse?search={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+
+    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <meta name="theme-color" content="#000000" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif:wght@700&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div id="root"></div>
