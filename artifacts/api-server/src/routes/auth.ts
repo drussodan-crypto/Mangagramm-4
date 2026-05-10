@@ -85,6 +85,8 @@ router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {
     res.status(404).json({ error: "User not found" });
     return;
   }
+  // Track last seen for online status
+  await db.update(usersTable).set({ lastSeenAt: new Date() }).where(eq(usersTable.id, req.session.userId!));
   const { password: _, ...userWithoutPassword } = user;
   res.json(userWithoutPassword);
 });

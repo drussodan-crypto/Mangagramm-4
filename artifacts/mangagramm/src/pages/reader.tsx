@@ -5,12 +5,13 @@ import { useAuth } from "@/lib/auth-context";
 import { ReactionPicker } from "@/components/reaction-picker";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, ChevronRight, MessageCircle, ArrowLeft, BookOpen, Lock, LayoutList, Rows, Send } from "lucide-react";
+import { ChevronLeft, ChevronRight, MessageCircle, ArrowLeft, BookOpen, Lock, LayoutList, Rows, Send, Heart, Reply, Pencil, Trash2, Image as ImageIcon, X, Check } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getClassForXp } from "@/components/class-badge";
 import { useToast } from "@/hooks/use-toast";
+import { ProfileAvatar } from "@/components/profile-avatar";
+import { cn } from "@/lib/utils";
 
 export default function Reader() {
   const { chapterId } = useParams<{ chapterId: string }>();
@@ -138,25 +139,74 @@ export default function Reader() {
     }
   }, [cId]);
 
+  const [commentImageUrl, setCommentImageUrl] = useState<string | null>(null);
+  const [uploadingCommentImage, setUploadingCommentImage] = useState(false);
+  const [replyTo, setReplyTo] = useState<{ id: number; username: string } | null>(null);
+  const [editingComment, setEditingComment] = useState<{ id: number; content: string } | null>(null);
+  const [likedComments, setLikedComments] = useState<Set<number>>(new Set());
+  const commentFileRef = useRef<HTMLInputElement>(null);
+
+  const uploadCommentImage = async (file: File) => {
+    setUploadingCommentImage(true);
+    try {
+      const meta = await fetch("/api/storage/uploads/request-url", {
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+      });
+      if (!meta.ok) throw new Error();
+      const { uploadURL, objectPath } = await meta.json();
+      await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      setCommentImageUrl(`/api/storage${objectPath}`);
+    } catch { toast({ title: "Erreur d'upload", variant: "destructive" }); }
+    finally { setUploadingCommentImage(false); }
+  };
+
   const handleComment = async () => {
-    if (!comment.trim() || !isAuthenticated || submittingComment) return;
+    if ((!comment.trim() && !commentImageUrl) || !isAuthenticated || submittingComment) return;
     setSubmittingComment(true);
     try {
       const res = await fetch("/api/comments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ chapterId: cId, content: comment.trim() }),
+        body: JSON.stringify({ chapterId: cId, content: comment.trim() || " ", imageUrl: commentImageUrl || undefined, parentId: replyTo?.id || undefined }),
       });
       if (res.ok) {
         setComment("");
+        setCommentImageUrl(null);
+        setReplyTo(null);
         queryClient.invalidateQueries({ queryKey: getGetChapterCommentsQueryKey(cId) });
       } else {
         toast({ title: "Erreur lors de l'envoi", variant: "destructive" });
       }
-    } finally {
-      setSubmittingComment(false);
-    }
+    } finally { setSubmittingComment(false); }
+  };
+
+  const handleDeleteComment = async (commentId: number) => {
+    await fetch(`/api/comments/${commentId}`, { method: "DELETE", credentials: "include" });
+    queryClient.invalidateQueries({ queryKey: getGetChapterCommentsQueryKey(cId) });
+  };
+
+  const handleEditComment = async (commentId: number, content: string) => {
+    await fetch(`/api/comments/${commentId}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include",
+      body: JSON.stringify({ content }),
+    });
+    setEditingComment(null);
+    queryClient.invalidateQueries({ queryKey: getGetChapterCommentsQueryKey(cId) });
+  };
+
+  const handleLikeComment = async (commentId: number) => {
+    if (!isAuthenticated) { toast({ title: "Connexion requise" }); return; }
+    await fetch("/api/likes/toggle", {
+      method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+      body: JSON.stringify({ targetType: "comment", targetId: commentId }),
+    });
+    setLikedComments(prev => {
+      const next = new Set(prev);
+      next.has(commentId) ? next.delete(commentId) : next.add(commentId);
+      return next;
+    });
   };
 
   /* ── LOADING ── */
@@ -401,35 +451,59 @@ export default function Reader() {
 
             {/* Post form */}
             {isAuthenticated ? (
-              <div className="flex gap-2 mb-6">
-                <Textarea
-                  placeholder="Écrire un commentaire…"
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleComment(); }}
-                  className="min-h-[60px] bg-zinc-900 border-white/10 text-white resize-none text-sm"
-                  data-testid="textarea-comment"
-                />
-                <Button
-                  onClick={handleComment}
-                  disabled={!comment.trim() || submittingComment}
-                  size="icon"
-                  className="h-10 w-10 shrink-0 self-end"
-                  data-testid="button-post-comment"
-                >
-                  <Send className="w-4 h-4" />
-                </Button>
+              <div className="mb-6">
+                {replyTo && (
+                  <div className="flex items-center justify-between text-xs text-gray-400 bg-white/5 rounded-t px-3 py-1.5 border border-white/10 border-b-0">
+                    <span>Réponse à <strong className="text-white">@{replyTo.username}</strong></span>
+                    <button onClick={() => setReplyTo(null)} className="hover:text-white"><X className="w-3 h-3" /></button>
+                  </div>
+                )}
+                {commentImageUrl && (
+                  <div className="relative inline-block mb-2">
+                    <img src={commentImageUrl} alt="Aperçu" className="max-h-24 rounded" />
+                    <button
+                      onClick={() => setCommentImageUrl(null)}
+                      className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Textarea
+                    placeholder={replyTo ? `Répondre à @${replyTo.username}…` : "Écrire un commentaire…"}
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleComment(); }}
+                    className={cn("min-h-[60px] bg-zinc-900 border-white/10 text-white resize-none text-sm", replyTo && "rounded-t-none")}
+                    data-testid="textarea-comment"
+                  />
+                  <div className="flex flex-col gap-1 self-end">
+                    <Button
+                      variant="ghost" size="icon" className="h-9 w-9 text-gray-400 hover:text-white hover:bg-white/10"
+                      onClick={() => commentFileRef.current?.click()}
+                      disabled={uploadingCommentImage}
+                      title="Joindre une image"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      onClick={handleComment}
+                      disabled={(!comment.trim() && !commentImageUrl) || submittingComment}
+                      size="icon" className="h-9 w-9 shrink-0"
+                      data-testid="button-post-comment"
+                    >
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+                <input ref={commentFileRef} type="file" accept="image/*" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) uploadCommentImage(f); e.target.value = ""; }} />
               </div>
             ) : (
               <div className="mb-6 p-3 rounded-lg bg-white/5 border border-white/10 flex items-center justify-between gap-3">
                 <p className="text-sm text-gray-400">Connectez-vous pour commenter</p>
-                <Button
-                  size="sm"
-                  onClick={() => setLocation("/login")}
-                  className="shrink-0"
-                >
-                  Se connecter
-                </Button>
+                <Button size="sm" onClick={() => setLocation("/login")} className="shrink-0">Se connecter</Button>
               </div>
             )}
 
@@ -441,24 +515,74 @@ export default function Reader() {
                   <p className="text-sm text-gray-500">Soyez le premier à commenter !</p>
                 </div>
               ) : (
-                comments.map((cm: any) => (
-                  <div key={cm.id} className="flex gap-3" data-testid={`comment-${cm.id}`}>
-                    <Avatar className="h-8 w-8 shrink-0">
-                      <AvatarFallback className="text-xs bg-zinc-800 text-white">
-                        {(cm.username || "?").charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                        <span className="text-sm font-medium text-white">{cm.username}</span>
-                        <span className="text-xs text-gray-500">
-                          {new Date(cm.createdAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
-                        </span>
+                comments.map((cm: any) => {
+                  const isOwn = user?.id === cm.userId;
+                  const liked = likedComments.has(cm.id);
+                  const isEditing = editingComment?.id === cm.id;
+                  return (
+                    <div key={cm.id} className={cn("flex gap-3", cm.parentId && "ml-8 pl-3 border-l border-white/10")} data-testid={`comment-${cm.id}`}>
+                      <ProfileAvatar src={cm.userAvatar} name={cm.username} xp={cm.userXp || 0} size="sm" showBadge className="shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                          <span className="text-sm font-medium text-white">{cm.username}</span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(cm.createdAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+                            {cm.editedAt && <span className="ml-1 italic">(modifié)</span>}
+                          </span>
+                        </div>
+
+                        {isEditing ? (
+                          <div className="flex gap-1 mt-1">
+                            <Textarea
+                              value={editingComment.content}
+                              onChange={e => setEditingComment({ id: cm.id, content: e.target.value })}
+                              className="min-h-[50px] bg-zinc-800 border-white/10 text-white resize-none text-sm py-1"
+                              autoFocus
+                            />
+                            <div className="flex flex-col gap-1">
+                              <Button size="icon" className="h-8 w-8" onClick={() => handleEditComment(cm.id, editingComment.content)}><Check className="w-3 h-3" /></Button>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-400" onClick={() => setEditingComment(null)}><X className="w-3 h-3" /></Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            {cm.imageUrl && <img src={cm.imageUrl} alt="Image" className="rounded max-w-[200px] mt-1 mb-1" />}
+                            <p className="text-sm text-gray-300 break-words leading-relaxed">{cm.content?.trim()}</p>
+                          </>
+                        )}
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-3 mt-1.5">
+                          <button
+                            onClick={() => handleLikeComment(cm.id)}
+                            className={cn("flex items-center gap-1 text-xs transition-colors", liked ? "text-red-400" : "text-gray-500 hover:text-red-400")}
+                          >
+                            <Heart className={cn("w-3.5 h-3.5", liked && "fill-current")} />
+                            <span>{(cm.likeCount || 0) + (liked ? 1 : 0)}</span>
+                          </button>
+                          {isAuthenticated && !cm.parentId && (
+                            <button
+                              onClick={() => setReplyTo({ id: cm.id, username: cm.username })}
+                              className="flex items-center gap-1 text-xs text-gray-500 hover:text-white transition-colors"
+                            >
+                              <Reply className="w-3.5 h-3.5" /> Répondre
+                            </button>
+                          )}
+                          {isOwn && !isEditing && (
+                            <>
+                              <button onClick={() => setEditingComment({ id: cm.id, content: cm.content })} className="text-xs text-gray-500 hover:text-yellow-400 transition-colors">
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button onClick={() => handleDeleteComment(cm.id)} className="text-xs text-gray-500 hover:text-red-400 transition-colors">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-300 break-words leading-relaxed">{cm.content}</p>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

@@ -1,24 +1,41 @@
-import { useState } from "react";
-import { useParams, Link } from "wouter";
+import { useState, useRef, useEffect } from "react";
+import { useParams, Link, useLocation } from "wouter";
 import { useGetUserProfile, useGetUserSeries, getGetUserProfileQueryKey, getGetUserSeriesQueryKey } from "@workspace/api-client-react";
 import { SeriesCard } from "@/components/series-card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye, Users, BookOpen, Calendar, Layers, Grid2x2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Eye, Layers, Grid2x2, MessageCircle, UserPlus, UserCheck, PenTool, Upload, X, Check, Loader2 } from "lucide-react";
 import { ClassBadge, XpProgressBar } from "@/components/class-badge";
+import { ProfileAvatar } from "@/components/profile-avatar";
 import { useAuth } from "@/lib/auth-context";
+import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 type Tab = "series" | "chapters";
 
 export default function Profile() {
   const { userId } = useParams<{ userId: string }>();
   const uId = parseInt(userId || "0", 10);
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, setUser } = useAuth();
+  const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
   const [tab, setTab] = useState<Tab>("series");
   const [chapters, setChapters] = useState<any[] | null>(null);
   const [chaptersLoading, setChaptersLoading] = useState(false);
+  const [following, setFollowing] = useState<boolean | null>(null);
+  const [followersCount, setFollowersCount] = useState<number | null>(null);
+
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editBio, setEditBio] = useState("");
+  const [editAvatar, setEditAvatar] = useState("");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const { data: profile, isLoading } = useGetUserProfile(uId, {
     query: { enabled: !!uId, queryKey: getGetUserProfileQueryKey(uId) },
@@ -29,6 +46,79 @@ export default function Profile() {
   });
 
   const isOwner = currentUser?.id === uId;
+  const p = profile as any;
+
+  useEffect(() => {
+    if (!isOwner && uId) {
+      fetch(`/api/follows/${uId}`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d) { setFollowing(d.following); setFollowersCount(d.followersCount); } })
+        .catch(() => {});
+    }
+  }, [uId, isOwner]);
+
+  const startEditing = () => {
+    setEditName(p?.displayName || p?.username || "");
+    setEditBio(p?.bio || "");
+    setEditAvatar(p?.avatar || "");
+    setEditing(true);
+  };
+
+  const uploadAvatar = async (file: File) => {
+    setUploadingAvatar(true);
+    try {
+      const meta = await fetch("/api/storage/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+      });
+      if (!meta.ok) throw new Error();
+      const { uploadURL, objectPath } = await meta.json();
+      await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      setEditAvatar(`/api/storage${objectPath}`);
+    } catch {
+      toast({ title: "Erreur d'upload", variant: "destructive" });
+    } finally { setUploadingAvatar(false); }
+  };
+
+  const saveProfile = async () => {
+    setSavingProfile(true);
+    try {
+      const r = await fetch("/api/users/me/update", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ displayName: editName, bio: editBio, avatar: editAvatar }),
+      });
+      if (r.ok) {
+        const updated = await r.json();
+        if (setUser) setUser({ ...currentUser!, displayName: updated.displayName, avatar: updated.avatar, bio: updated.bio });
+        queryClient.invalidateQueries({ queryKey: getGetUserProfileQueryKey(uId) });
+        toast({ title: "✓ Profil mis à jour" });
+        setEditing(false);
+      }
+    } finally { setSavingProfile(false); }
+  };
+
+  const handleFollow = async () => {
+    const r = await fetch(`/api/follows/${uId}`, { method: "POST", credentials: "include" });
+    if (r.ok) {
+      const data = await r.json();
+      setFollowing(data.following);
+      setFollowersCount(data.followersCount);
+    }
+  };
+
+  const startDM = async () => {
+    const r = await fetch("/api/messages/threads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ recipientId: uId }),
+    });
+    if (r.ok) setLocation("/messages");
+  };
 
   const loadChapters = async () => {
     if (chapters) return;
@@ -40,140 +130,186 @@ export default function Profile() {
     finally { setChaptersLoading(false); }
   };
 
-  const handleTabChange = (t: Tab) => {
-    setTab(t);
-    if (t === "chapters") loadChapters();
-  };
-
   if (isLoading) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-        <div className="flex gap-6">
-          <Skeleton className="h-24 w-24 rounded-full" />
-          <div className="space-y-2 flex-1">
-            <Skeleton className="h-6 w-1/3" />
-            <Skeleton className="h-4 w-1/2" />
-          </div>
-        </div>
+        <div className="flex gap-6"><Skeleton className="h-28 w-28 rounded-full" /><div className="space-y-2 flex-1"><Skeleton className="h-6 w-1/3" /><Skeleton className="h-4 w-1/2" /></div></div>
       </div>
     );
   }
 
-  if (!profile) {
-    return <div className="text-center py-20 text-muted-foreground">Utilisateur introuvable</div>;
-  }
+  if (!profile) return <div className="text-center py-20 text-muted-foreground">Utilisateur introuvable</div>;
 
-  const p = profile as any;
+  const xp = p?.xp || 0;
+  const avatarToShow = editing ? editAvatar : p?.avatar;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8" data-testid="page-profile">
+
+      {/* ── HEADER ── */}
       <div className="flex flex-col sm:flex-row gap-6 mb-8">
-        <Avatar className="h-24 w-24">
-          <AvatarImage src={p.avatar || ""} />
-          <AvatarFallback className="text-2xl font-bold bg-primary text-primary-foreground">
-            {(p.displayName || p.username || "?").charAt(0).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
-        <div className="space-y-3 flex-1">
-          <div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl font-serif font-bold">{p.displayName || p.username}</h1>
-              <ClassBadge xp={p.xp || 0} size="sm" showDiscount />
-            </div>
-            <p className="text-sm text-muted-foreground">@{p.username}</p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="secondary">{p.role === "author" ? "✍️ Auteur" : p.role === "admin" ? "⚙️ Admin" : "📖 Lecteur"}</Badge>
-          </div>
-          {p.xp !== undefined && (
-            <XpProgressBar xp={p.xp || 0} className="max-w-sm" />
+        {/* Avatar with badge overlay + online dot */}
+        <div className="relative shrink-0" style={{ width: 112, height: 112 }}>
+          <ProfileAvatar
+            src={avatarToShow}
+            name={p?.displayName || p?.username}
+            xp={xp}
+            size="xl"
+            showOnline
+            lastSeenAt={p?.lastSeenAt}
+            hideOnlineStatus={p?.hideOnlineStatus}
+          />
+          {editing && (
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={uploadingAvatar}
+              className="absolute inset-0 rounded-full flex items-center justify-center bg-black/50 text-white opacity-0 hover:opacity-100 transition-opacity z-20"
+            >
+              {uploadingAvatar ? <Loader2 className="w-7 h-7 animate-spin" /> : <Upload className="w-7 h-7" />}
+            </button>
           )}
-          {p.bio && <p className="text-sm text-muted-foreground max-w-lg">{p.bio}</p>}
-          <div className="flex gap-6 text-sm text-muted-foreground flex-wrap">
-            <span className="flex items-center gap-1"><BookOpen className="w-4 h-4" /> {p.seriesCount} Séries</span>
-            <span className="flex items-center gap-1"><Users className="w-4 h-4" /> {p.followersCount} Abonnés</span>
-            <span className="flex items-center gap-1"><Eye className="w-4 h-4" /> {p.totalViews} Vues</span>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <Calendar className="w-3 h-3" /> Inscrit le {new Date(p.createdAt).toLocaleDateString("fr-FR")}
-            </p>
-            {isOwner && (
-              <>
-                <Link href="/payouts">
-                  <Button variant="outline" size="sm" className="gap-1.5 text-green-500 border-green-500/30 hover:bg-green-500/10">
-                    💰 Mes revenus
-                  </Button>
-                </Link>
-                <Link href="/coins">
-                  <Button variant="outline" size="sm" className="gap-1.5 text-yellow-500 border-yellow-500/30 hover:bg-yellow-500/10">
-                    🪙 Coins
-                  </Button>
-                </Link>
-              </>
-            )}
-          </div>
+        </div>
+        <input ref={fileRef} type="file" accept="image/*" className="hidden"
+          onChange={e => { const f = e.target.files?.[0]; if (f) uploadAvatar(f); e.target.value = ""; }} />
+
+        {/* Info / Edit form */}
+        <div className="space-y-3 flex-1">
+          {!editing ? (
+            <>
+              <div>
+                <div className="flex items-center gap-3 flex-wrap mb-1">
+                  <h1 className="text-2xl font-serif font-bold">{p?.displayName || p?.username}</h1>
+                  <ClassBadge xp={xp} size="sm" />
+                  {p?.role === "author" && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded font-medium">Auteur</span>}
+                </div>
+                <p className="text-sm text-muted-foreground">@{p?.username}</p>
+                {p?.bio && <p className="text-sm mt-2 text-foreground/80">{p.bio}</p>}
+              </div>
+
+              <XpProgressBar xp={xp} />
+
+              <div className="flex gap-5 text-sm">
+                <div className="text-center cursor-pointer hover:opacity-70">
+                  <p className="font-bold">{followersCount ?? p?.followersCount ?? 0}</p>
+                  <p className="text-xs text-muted-foreground">Abonnés</p>
+                </div>
+                <div className="text-center cursor-pointer hover:opacity-70">
+                  <p className="font-bold">{p?.followingCount || 0}</p>
+                  <p className="text-xs text-muted-foreground">Abonnements</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-bold">{p?.seriesCount || 0}</p>
+                  <p className="text-xs text-muted-foreground">Séries</p>
+                </div>
+                {p?.role === "author" && (
+                  <div className="text-center">
+                    <p className="font-bold">{(p?.totalViews || 0).toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">Vues</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {isOwner ? (
+                  <>
+                    <Button size="sm" variant="outline" onClick={startEditing} className="gap-1">
+                      <PenTool className="w-3.5 h-3.5" /> Modifier le profil
+                    </Button>
+                    <Link href="/settings">
+                      <Button size="sm" variant="ghost">Paramètres</Button>
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    {currentUser && (
+                      <Button size="sm" variant={following ? "secondary" : "default"} onClick={handleFollow} className="gap-1">
+                        {following ? <><UserCheck className="w-3.5 h-3.5" /> Suivi</> : <><UserPlus className="w-3.5 h-3.5" /> Suivre</>}
+                      </Button>
+                    )}
+                    {currentUser && (
+                      <Button size="sm" variant="outline" onClick={startDM} className="gap-1">
+                        <MessageCircle className="w-3.5 h-3.5" /> Message
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="space-y-3 max-w-sm">
+              <div>
+                <label className="text-xs font-medium mb-1 block text-muted-foreground">Nom affiché</label>
+                <Input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Votre nom" className="h-9" />
+              </div>
+              <div>
+                <label className="text-xs font-medium mb-1 block text-muted-foreground">Bio</label>
+                <Textarea value={editBio} onChange={e => setEditBio(e.target.value)} placeholder="Parlez de vous…" className="min-h-[80px] resize-none text-sm" />
+              </div>
+              <p className="text-xs text-muted-foreground">💡 Cliquez sur la photo pour changer l'avatar</p>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={saveProfile} disabled={savingProfile} className="gap-1">
+                  {savingProfile ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  Enregistrer
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditing(false)} className="gap-1">
+                  <X className="w-3.5 h-3.5" /> Annuler
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="flex gap-1 border-b border-border mb-6">
-        <button
-          onClick={() => handleTabChange("series")}
-          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === "series" ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-          data-testid="tab-series"
-        >
-          <Grid2x2 className="w-4 h-4" /> Séries ({p.seriesCount || 0})
-        </button>
-        <button
-          onClick={() => handleTabChange("chapters")}
-          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === "chapters" ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-          data-testid="tab-chapters"
-        >
-          <Layers className="w-4 h-4" /> Chapitres
-        </button>
+      {/* ── TABS ── */}
+      <div className="flex border-b border-border mb-6">
+        {[
+          { id: "series" as Tab, label: "Séries", icon: <Grid2x2 className="w-4 h-4" /> },
+          { id: "chapters" as Tab, label: "Chapitres", icon: <Layers className="w-4 h-4" /> },
+        ].map(t => (
+          <button
+            key={t.id}
+            onClick={() => { setTab(t.id); if (t.id === "chapters") loadChapters(); }}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              tab === t.id ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t.icon}{t.label}
+          </button>
+        ))}
       </div>
 
       {tab === "series" && (
-        <div>
-          {series && (series as any[]).length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {(series as any[]).map((s: any) => (
-                <SeriesCard key={s.id} {...s} />
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-12">Aucune série publiée.</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {((series as any[]) || []).map((s: any) => (
+            <SeriesCard key={s.id} series={{ ...s, authorName: p?.displayName || p?.username, authorAvatar: p?.avatar }} />
+          ))}
+          {((series as any[]) || []).length === 0 && (
+            <p className="col-span-4 text-center py-12 text-sm text-muted-foreground">Aucune série publiée</p>
           )}
         </div>
       )}
 
       {tab === "chapters" && (
-        <div>
-          {chaptersLoading ? (
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-14 rounded-lg" />)}
-            </div>
-          ) : chapters && chapters.length > 0 ? (
-            <div className="space-y-2">
-              {chapters.map((c: any) => (
-                <Link key={c.id} href={`/read/${c.id}`} data-testid={`chapter-link-${c.id}`}>
-                  <div className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors cursor-pointer">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-xs text-muted-foreground w-16 shrink-0">{c.seriesTitle}</span>
-                      <span className="text-sm font-medium">Ch.{c.number}</span>
-                      <span className="text-sm truncate">{c.title}</span>
-                      {c.isPremium && <Badge className="text-[10px] bg-yellow-500/20 text-yellow-500 border-yellow-500/20">★ Premium</Badge>}
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
-                      <span><Eye className="w-3 h-3 inline mr-0.5" />{c.viewCount}</span>
-                      <span>{c.publishedAt ? new Date(c.publishedAt).toLocaleDateString("fr-FR") : ""}</span>
-                    </div>
+        <div className="space-y-2">
+          {chaptersLoading && <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>}
+          {!chaptersLoading && (chapters || []).map((c: any) => (
+            <Link key={c.id} href={`/read/${c.id}`}>
+              <div className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors cursor-pointer">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-xs text-muted-foreground font-mono shrink-0">Ch.{c.number}</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{c.title}</p>
+                    <p className="text-xs text-muted-foreground truncate">{c.seriesTitle}</p>
                   </div>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-12">Aucun chapitre publié.</p>
+                </div>
+                <span className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+                  <Eye className="w-3 h-3" />{c.viewCount}
+                </span>
+              </div>
+            </Link>
+          ))}
+          {!chaptersLoading && (chapters || []).length === 0 && (
+            <p className="text-center py-12 text-sm text-muted-foreground">Aucun chapitre publié</p>
           )}
         </div>
       )}

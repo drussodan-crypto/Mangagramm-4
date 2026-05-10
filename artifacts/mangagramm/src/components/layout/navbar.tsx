@@ -1,33 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { useTranslation } from "react-i18next";
 import { SUPPORTED_LANGUAGES } from "@/lib/i18n";
-import { Search, Bell, Menu, X, Sun, Moon, Monitor, User, LogOut, Settings, PenTool, Heart, History } from "lucide-react";
+import { Search, Bell, Menu, X, Sun, Moon, Monitor, User, LogOut, Settings, PenTool, Heart, History, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ClassBadge } from "@/components/class-badge";
+import { ProfileAvatar } from "@/components/profile-avatar";
 
 function BrushLogo({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 28 52" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-      {/* Handle */}
       <rect x="9" y="0" width="10" height="24" rx="5" fill="currentColor" opacity="0.9"/>
-      {/* Grip lines */}
       <rect x="9" y="7" width="10" height="1.5" rx="0.75" fill="currentColor" opacity="0.35"/>
       <rect x="9" y="11" width="10" height="1.5" rx="0.75" fill="currentColor" opacity="0.35"/>
       <rect x="9" y="15" width="10" height="1.5" rx="0.75" fill="currentColor" opacity="0.35"/>
-      {/* Ferrule */}
       <rect x="7" y="24" width="14" height="6" rx="2" fill="currentColor" opacity="0.6"/>
       <rect x="7" y="24" width="14" height="2.5" rx="1" fill="currentColor" opacity="0.85"/>
-      {/* Bristle body */}
       <path d="M7 30 L21 30 L19 38 L9 38 Z" fill="currentColor"/>
-      {/* Bristle tip */}
       <path d="M9 38 Q14 52 14 52 Q14 52 19 38 Z" fill="currentColor"/>
-      {/* Ink highlight */}
       <ellipse cx="14" cy="46" rx="2" ry="3.5" fill="currentColor" opacity="0.3"/>
     </svg>
   );
@@ -40,6 +34,23 @@ export function Navbar() {
   const [, setLocation] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [unreadMessages, setUnreadMessages] = useState(0);
+
+  const userXp = (user as any)?.xp || 0;
+
+  // Poll unread message count
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const poll = async () => {
+      try {
+        const r = await fetch("/api/messages/unread-count", { credentials: "include" });
+        if (r.ok) { const d = await r.json(); setUnreadMessages(d.count || 0); }
+      } catch {}
+    };
+    poll();
+    const t = setInterval(poll, 30000);
+    return () => clearInterval(t);
+  }, [isAuthenticated]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,8 +60,6 @@ export function Navbar() {
       setMobileMenuOpen(false);
     }
   };
-
-  const userXp = (user as any)?.xp || 0;
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60" data-testid="navbar">
@@ -66,7 +75,7 @@ export function Navbar() {
         <nav className="hidden md:flex items-center gap-1">
           <Link href="/" className="px-3 py-2 text-sm font-medium rounded-md hover:bg-accent transition-colors">{t("discover")}</Link>
           <Link href="/browse" className="px-3 py-2 text-sm font-medium rounded-md hover:bg-accent transition-colors">{t("browse")}</Link>
-          {isAuthenticated && user?.role === "author" && (
+          {isAuthenticated && (user as any)?.role === "author" && (
             <Link href="/dashboard" className="px-3 py-2 text-sm font-medium rounded-md hover:bg-accent transition-colors">{t("dashboard")}</Link>
           )}
         </nav>
@@ -136,6 +145,18 @@ export function Navbar() {
 
           {isAuthenticated ? (
             <>
+              {/* Messages */}
+              <Link href="/messages">
+                <Button variant="ghost" size="icon" className="h-9 w-9 relative" data-testid="button-messages">
+                  <MessageCircle className="w-4 h-4" />
+                  {unreadMessages > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary text-primary-foreground rounded-full text-[10px] font-bold flex items-center justify-center">
+                      {unreadMessages > 9 ? "9+" : unreadMessages}
+                    </span>
+                  )}
+                </Button>
+              </Link>
+
               <Link href="/notifications">
                 <Button variant="ghost" size="icon" className="h-9 w-9" data-testid="button-notifications">
                   <Bell className="w-4 h-4" />
@@ -146,12 +167,14 @@ export function Navbar() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-9 gap-2 px-2 rounded-full" data-testid="button-user-menu">
-                    <Avatar className="h-7 w-7">
-                      <AvatarImage src={user?.avatar || ""} />
-                      <AvatarFallback className="text-xs font-semibold bg-primary text-primary-foreground">
-                        {(user?.displayName || user?.username || "U").charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
+                    <ProfileAvatar
+                      src={user?.avatar}
+                      name={user?.displayName || user?.username}
+                      xp={userXp}
+                      size="xs"
+                      showBadge
+                      showOnline={false}
+                    />
                     <div className="hidden sm:flex flex-col items-start leading-none">
                       <span className="text-xs font-medium max-w-[80px] truncate">{user?.displayName || user?.username}</span>
                       <ClassBadge xp={userXp} size="sm" className="mt-0.5" />
@@ -168,11 +191,15 @@ export function Navbar() {
                   <DropdownMenuItem onClick={() => setLocation(`/profile/${user?.id}`)} data-testid="menu-profile">
                     <User className="w-4 h-4 mr-2" /> {t("profile")}
                   </DropdownMenuItem>
-                  {user?.role === "author" && (
+                  {(user as any)?.role === "author" && (
                     <DropdownMenuItem onClick={() => setLocation("/dashboard")} data-testid="menu-dashboard">
                       <PenTool className="w-4 h-4 mr-2" /> {t("dashboard")}
                     </DropdownMenuItem>
                   )}
+                  <DropdownMenuItem onClick={() => setLocation("/messages")} data-testid="menu-messages">
+                    <MessageCircle className="w-4 h-4 mr-2" /> Messages
+                    {unreadMessages > 0 && <span className="ml-auto text-xs bg-primary text-primary-foreground rounded-full px-1.5">{unreadMessages}</span>}
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setLocation("/favorites")} data-testid="menu-favorites">
                     <Heart className="w-4 h-4 mr-2" /> {t("favorites")}
                   </DropdownMenuItem>
@@ -182,7 +209,7 @@ export function Navbar() {
                   <DropdownMenuItem onClick={() => setLocation("/coins")} data-testid="menu-coins">
                     🪙 Mes Coins
                   </DropdownMenuItem>
-                  {user?.role === "author" && (
+                  {(user as any)?.role === "author" && (
                     <DropdownMenuItem onClick={() => setLocation("/payouts")} data-testid="menu-payouts">
                       💰 Mes Revenus
                     </DropdownMenuItem>
@@ -226,8 +253,14 @@ export function Navbar() {
           </form>
           <Link href="/" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 text-sm font-medium rounded-md hover:bg-accent">{t("discover")}</Link>
           <Link href="/browse" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 text-sm font-medium rounded-md hover:bg-accent">{t("browse")}</Link>
-          {isAuthenticated && user?.role === "author" && (
+          {isAuthenticated && (user as any)?.role === "author" && (
             <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 text-sm font-medium rounded-md hover:bg-accent">{t("dashboard")}</Link>
+          )}
+          {isAuthenticated && (
+            <Link href="/messages" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md hover:bg-accent">
+              <MessageCircle className="w-4 h-4" /> Messages
+              {unreadMessages > 0 && <span className="ml-auto text-xs bg-primary text-primary-foreground rounded-full px-1.5">{unreadMessages}</span>}
+            </Link>
           )}
           {!isAuthenticated && (
             <Button onClick={login} className="w-full mt-2" size="sm">{t("login")}</Button>

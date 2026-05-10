@@ -1,10 +1,26 @@
 import { Router, type IRouter } from "express";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, ilike } from "drizzle-orm";
 import { db, usersTable, seriesTable, followsTable, chaptersTable, pagesTable } from "@workspace/db";
 import { UpdateProfileBody } from "@workspace/api-zod";
 import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
+
+router.get("/users/search", async (req, res): Promise<void> => {
+  const q = (req.query.q as string || "").trim();
+  if (!q || q.length < 2) { res.json([]); return; }
+  const results = await db.select({
+    id: usersTable.id,
+    username: usersTable.username,
+    displayName: usersTable.displayName,
+    avatar: usersTable.avatar,
+    role: usersTable.role,
+    xp: usersTable.xp,
+  }).from(usersTable)
+    .where(ilike(usersTable.username, `%${q}%`))
+    .limit(10);
+  res.json(results);
+});
 
 router.get("/users/:userId", async (req, res): Promise<void> => {
   const userId = parseInt(Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId, 10);

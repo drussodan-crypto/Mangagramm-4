@@ -13,10 +13,14 @@ router.post("/comments", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
+  const { imageUrl, parentId } = req.body;
+
   const [comment] = await db.insert(commentsTable).values({
     chapterId: parsed.data.chapterId,
     userId: req.session.userId!,
     content: parsed.data.content,
+    imageUrl: imageUrl || null,
+    parentId: parentId || null,
   }).returning();
 
   await db.update(chaptersTable).set({ commentCount: sql`${chaptersTable.commentCount} + 1` }).where(eq(chaptersTable.id, parsed.data.chapterId));
@@ -50,6 +54,27 @@ router.get("/comments/chapter/:chapterId", async (req, res): Promise<void> => {
   res.json(commentsWithUsers);
 });
 
+router.put("/comments/:commentId", requireAuth, async (req, res): Promise<void> => {
+  const commentId = parseInt(Array.isArray(req.params.commentId) ? req.params.commentId[0] : req.params.commentId, 10);
+  if (isNaN(commentId)) { res.status(400).json({ error: "Invalid comment ID" }); return; }
+
+  const [comment] = await db.select().from(commentsTable).where(eq(commentsTable.id, commentId));
+  if (!comment) { res.status(404).json({ error: "Comment not found" }); return; }
+  if (comment.userId !== req.session.userId!) { res.status(403).json({ error: "Not your comment" }); return; }
+
+  const { content, imageUrl } = req.body;
+  if (!content && !imageUrl) { res.status(400).json({ error: "content or imageUrl required" }); return; }
+
+  const [updated] = await db.update(commentsTable).set({
+    content: content || comment.content,
+    imageUrl: imageUrl !== undefined ? imageUrl : comment.imageUrl,
+    editedAt: new Date(),
+  }).where(eq(commentsTable.id, commentId)).returning();
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, comment.userId));
+  res.json({ ...updated, username: user?.username || "Unknown", userAvatar: user?.avatar || null });
+});
+
 router.delete("/comments/:commentId", requireAuth, async (req, res): Promise<void> => {
   const commentId = parseInt(Array.isArray(req.params.commentId) ? req.params.commentId[0] : req.params.commentId, 10);
   if (isNaN(commentId)) {
@@ -58,6 +83,10 @@ router.delete("/comments/:commentId", requireAuth, async (req, res): Promise<voi
   }
 
   const [comment] = await db.select().from(commentsTable).where(eq(commentsTable.id, commentId));
+  if (comment && comment.userId !== req.session.userId!) {
+    res.status(403).json({ error: "Not your comment" });
+    return;
+  }
   if (comment) {
     await db.update(chaptersTable).set({ commentCount: sql`greatest(${chaptersTable.commentCount} - 1, 0)` }).where(eq(chaptersTable.id, comment.chapterId));
   }

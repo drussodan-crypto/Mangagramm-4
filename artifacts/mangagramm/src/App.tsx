@@ -1,4 +1,5 @@
 import "@/lib/i18n";
+import { useState } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -21,7 +22,9 @@ import SettingsPage from "@/pages/settings";
 import Login from "@/pages/login";
 import CoinsPage from "@/pages/coins";
 import PayoutsPage from "@/pages/payouts";
+import MessagesPage from "@/pages/messages";
 import NotFound from "@/pages/not-found";
+import { SplashScreen } from "@/components/splash-screen";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -49,6 +52,8 @@ function Router() {
       <Route path="/settings" component={SettingsPage} />
       <Route path="/coins" component={CoinsPage} />
       <Route path="/payouts" component={PayoutsPage} />
+      <Route path="/messages" component={MessagesPage} />
+      <Route path="/messages/:threadId" component={MessagesPage} />
       <Route path="/login" component={Login} />
       <Route component={NotFound} />
     </Switch>
@@ -56,12 +61,14 @@ function Router() {
 }
 
 function App() {
+  const [splash, setSplash] = useState(true);
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
           <TooltipProvider>
             <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <SplashScreen show={splash} onDone={() => setSplash(false)} />
               <Navbar />
               <main>
                 <Router />

@@ -3,19 +3,23 @@ import { cn } from "@/lib/utils";
 export interface ClassInfo {
   level: number;
   name: string;
+  label: string;
   minXp: number;
   maxXp: number;
   discount: number;
   color: string;
+  gradient?: string;
+  ring?: string;
+  animated?: boolean;
 }
 
 export const CLASS_LEVELS: ClassInfo[] = [
-  { level: 4, name: "Classe 4", minXp: 0, maxXp: 99, discount: 0, color: "#6b7280" },
-  { level: 3, name: "Classe 3", minXp: 100, maxXp: 299, discount: 0, color: "#3b82f6" },
-  { level: 2, name: "Classe 2", minXp: 300, maxXp: 599, discount: 0, color: "#8b5cf6" },
-  { level: 1, name: "Classe 1", minXp: 600, maxXp: 999, discount: 5, color: "#f59e0b" },
-  { level: 0, name: "Classe S", minXp: 1000, maxXp: 1999, discount: 15, color: "#ef4444" },
-  { level: -1, name: "Niveau Dieu", minXp: 2000, maxXp: Infinity, discount: 25, color: "#a855f7" },
+  { level: 4, name: "Classe 4", label: "4", minXp: 0, maxXp: 99, discount: 0, color: "#6b7280", ring: "ring-gray-500" },
+  { level: 3, name: "Classe 3", label: "3", minXp: 100, maxXp: 299, discount: 0, color: "#3b82f6", ring: "ring-blue-500" },
+  { level: 2, name: "Classe 2", label: "2", minXp: 300, maxXp: 599, discount: 0, color: "#8b5cf6", ring: "ring-purple-500" },
+  { level: 1, name: "Classe 1", label: "1", minXp: 600, maxXp: 999, discount: 5, color: "#f59e0b", ring: "ring-amber-500" },
+  { level: 0, name: "Classe S", label: "S", minXp: 1000, maxXp: 1999, discount: 15, color: "#ef4444", gradient: "linear-gradient(135deg,#ef4444,#f97316)", ring: "ring-red-500" },
+  { level: -1, name: "Niveau Dieu", label: "⚡", minXp: 2000, maxXp: Infinity, discount: 25, color: "#a855f7", gradient: "linear-gradient(135deg,#a855f7,#6366f1,#ec4899)", ring: "ring-purple-400", animated: true },
 ];
 
 export function getClassForXp(xp: number): ClassInfo {
@@ -96,7 +100,7 @@ export function XpProgressBar({ xp, className }: XpProgressBarProps) {
           className="h-full rounded-full transition-all duration-500"
           style={{
             width: `${progress}%`,
-            backgroundColor: cls.color,
+            background: cls.gradient || cls.color,
             boxShadow: `0 0 6px ${cls.color}`,
           }}
         />

@@ -18,6 +18,7 @@ export const usersTable = pgTable("users", {
   coins: integer("coins").notNull().default(0),
   earnedCoins: integer("earned_coins").notNull().default(0),
   classLevel: integer("class_level").notNull().default(4),
+  lastSeenAt: timestamp("last_seen_at"),
   lastReadAt: timestamp("last_read_at"),
   payoutNumber: text("payout_number"),
   payoutMethod: text("payout_method").default("mtn"),

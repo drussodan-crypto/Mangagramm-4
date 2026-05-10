@@ -14,6 +14,7 @@ import xpRouter from "./xp";
 import paymentsRouter from "./payments";
 import payoutsRouter from "./payouts";
 import readingHistoryRouter from "./reading-history";
+import messagesRouter from "./messages";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(xpRouter);
 router.use(readingHistoryRouter);
 router.use(paymentsRouter);
 router.use(payoutsRouter);
+router.use(messagesRouter);
 
 export default router;

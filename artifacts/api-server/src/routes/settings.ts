@@ -32,6 +32,7 @@ router.put("/settings", requireAuth, async (req, res): Promise<void> => {
   if (parsed.data.readingDirection !== undefined) updateData.readingDirection = parsed.data.readingDirection;
   if (parsed.data.autoNextChapter !== undefined) updateData.autoNextChapter = parsed.data.autoNextChapter;
   if (parsed.data.pageLayout !== undefined) updateData.pageLayout = parsed.data.pageLayout;
+  if ((parsed.data as any).hideOnlineStatus !== undefined) updateData.hideOnlineStatus = (parsed.data as any).hideOnlineStatus;
 
   let [settings] = await db.select().from(settingsTable).where(eq(settingsTable.userId, req.session.userId!));
 

@@ -18,6 +18,7 @@ export const settingsTable = pgTable("settings", {
   readingDirection: readingDirectionEnum("reading_direction").notNull().default("ltr"),
   autoNextChapter: boolean("auto_next_chapter").notNull().default(true),
   pageLayout: pageLayoutEnum("page_layout").notNull().default("scroll"),
+  hideOnlineStatus: boolean("hide_online_status").notNull().default(false),
 });
 
 export const insertSettingsSchema = createInsertSchema(settingsTable).omit({ id: true });
