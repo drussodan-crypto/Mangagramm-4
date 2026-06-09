@@ -115,6 +115,8 @@ router.post("/likes/toggle", requireAuth, async (req, res): Promise<void> => {
     liked = false;
     if (targetType === "series") {
       await db.update(seriesTable).set({ likeCount: sql`greatest(${seriesTable.likeCount} - 1, 0)` }).where(eq(seriesTable.id, targetId));
+    } else if (targetType === "comment") {
+      await db.update(commentsTable).set({ likeCount: sql`greatest(${commentsTable.likeCount} - 1, 0)` }).where(eq(commentsTable.id, targetId));
     } else {
       await db.update(chaptersTable).set({ likeCount: sql`greatest(${chaptersTable.likeCount} - 1, 0)` }).where(eq(chaptersTable.id, targetId));
     }
@@ -123,6 +125,8 @@ router.post("/likes/toggle", requireAuth, async (req, res): Promise<void> => {
     liked = true;
     if (targetType === "series") {
       await db.update(seriesTable).set({ likeCount: sql`${seriesTable.likeCount} + 1` }).where(eq(seriesTable.id, targetId));
+    } else if (targetType === "comment") {
+      await db.update(commentsTable).set({ likeCount: sql`${commentsTable.likeCount} + 1` }).where(eq(commentsTable.id, targetId));
     } else {
       await db.update(chaptersTable).set({ likeCount: sql`${chaptersTable.likeCount} + 1` }).where(eq(chaptersTable.id, targetId));
     }
@@ -133,6 +137,24 @@ router.post("/likes/toggle", requireAuth, async (req, res): Promise<void> => {
   );
 
   res.json({ liked, likeCount: likeCount?.count || 0 });
+});
+
+router.get("/likes/my-comment-likes", async (req, res): Promise<void> => {
+  const chapterId = parseInt(String(req.query.chapterId || "0"), 10);
+  if (!chapterId) { res.json([]); return; }
+  const userId = (req.session as any).userId;
+  if (!userId) { res.json([]); return; }
+
+  const chapterComments = await db.select({ id: commentsTable.id }).from(commentsTable).where(eq(commentsTable.chapterId, chapterId));
+  if (chapterComments.length === 0) { res.json([]); return; }
+
+  const commentIds = chapterComments.map(c => c.id);
+  const myLikes = await db.select({ targetId: likesTable.targetId }).from(likesTable).where(
+    and(eq(likesTable.userId, userId), eq(likesTable.targetType, "comment"))
+  );
+
+  const likedIds = myLikes.map(l => l.targetId).filter(id => commentIds.includes(id));
+  res.json(likedIds);
 });
 
 router.get("/likes/check", async (req, res): Promise<void> => {

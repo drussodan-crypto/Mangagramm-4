@@ -144,7 +144,17 @@ export default function Reader() {
   const [replyTo, setReplyTo] = useState<{ id: number; username: string } | null>(null);
   const [editingComment, setEditingComment] = useState<{ id: number; content: string } | null>(null);
   const [likedComments, setLikedComments] = useState<Set<number>>(new Set());
+  const [likeDeltas, setLikeDeltas] = useState<Map<number, number>>(new Map());
   const commentFileRef = useRef<HTMLInputElement>(null);
+
+  // Load initial liked state from DB
+  useEffect(() => {
+    if (!cId || !isAuthenticated) return;
+    fetch(`/api/likes/my-comment-likes?chapterId=${cId}`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : [])
+      .then((ids: number[]) => setLikedComments(new Set(ids)))
+      .catch(() => {});
+  }, [cId, isAuthenticated]);
 
   const uploadCommentImage = async (file: File) => {
     setUploadingCommentImage(true);
@@ -198,15 +208,32 @@ export default function Reader() {
 
   const handleLikeComment = async (commentId: number) => {
     if (!isAuthenticated) { toast({ title: "Connexion requise" }); return; }
-    await fetch("/api/likes/toggle", {
+    const wasLiked = likedComments.has(commentId);
+    // Optimistic update
+    setLikedComments(prev => {
+      const next = new Set(prev);
+      wasLiked ? next.delete(commentId) : next.add(commentId);
+      return next;
+    });
+    setLikeDeltas(prev => {
+      const next = new Map(prev);
+      next.set(commentId, (next.get(commentId) || 0) + (wasLiked ? -1 : 1));
+      return next;
+    });
+    const res = await fetch("/api/likes/toggle", {
       method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
       body: JSON.stringify({ targetType: "comment", targetId: commentId }),
     });
-    setLikedComments(prev => {
-      const next = new Set(prev);
-      next.has(commentId) ? next.delete(commentId) : next.add(commentId);
-      return next;
-    });
+    if (res.ok) {
+      const data = await res.json();
+      // Sync deltas so display stays accurate
+      setLikeDeltas(prev => {
+        const next = new Map(prev);
+        next.delete(commentId);
+        return next;
+      });
+      queryClient.invalidateQueries({ queryKey: getGetChapterCommentsQueryKey(cId) });
+    }
   };
 
   /* ── LOADING ── */
@@ -558,7 +585,7 @@ export default function Reader() {
                             className={cn("flex items-center gap-1 text-xs transition-colors", liked ? "text-red-400" : "text-gray-500 hover:text-red-400")}
                           >
                             <Heart className={cn("w-3.5 h-3.5", liked && "fill-current")} />
-                            <span>{(cm.likeCount || 0) + (liked ? 1 : 0)}</span>
+                            <span>{Math.max(0, (cm.likeCount || 0) + (likeDeltas.get(cm.id) || 0))}</span>
                           </button>
                           {isAuthenticated && !cm.parentId && (
                             <button

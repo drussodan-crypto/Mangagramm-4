@@ -39,15 +39,23 @@ async function upsertReplitUser(claims: Record<string, unknown>) {
     .from(usersTable)
     .where(or(eq(usersTable.replitId, replitId), ...(email ? [eq(usersTable.email, email)] : [])));
 
+  const CERTIFIED_EMAILS = ["drussodan@gmail.com", "mangagramm@gmail.com"];
+  const isAutoVerified = email ? CERTIFIED_EMAILS.includes(email) : false;
+
   if (existing.length > 0) {
     const user = existing[0];
+    const updateSet: any = {
+      replitId,
+      avatar: avatar || user.avatar,
+      displayName: displayName || user.displayName,
+    };
+    if (isAutoVerified) {
+      updateSet.verified = true;
+      updateSet.role = "author";
+    }
     const [updated] = await db
       .update(usersTable)
-      .set({
-        replitId,
-        avatar: avatar || user.avatar,
-        displayName: displayName || user.displayName,
-      })
+      .set(updateSet)
       .where(eq(usersTable.id, user.id))
       .returning();
     return updated;
@@ -64,8 +72,9 @@ async function upsertReplitUser(claims: Record<string, unknown>) {
       username: uniqueUsername,
       displayName: displayName || uniqueUsername,
       avatar: avatar || null,
-      role: "reader",
-    })
+      role: isAutoVerified ? "author" : "reader",
+      ...(isAutoVerified ? { verified: true } : {}),
+    } as any)
     .returning();
 
   return newUser;

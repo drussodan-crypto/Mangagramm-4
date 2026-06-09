@@ -1,0 +1,81 @@
+‎et lorsque l'utilisateur active l'option "lecture horizontal" de la gauche vers la droite ou de la droite vers la gauche... l'option doit être sauvegardée jusqu'à pour toutes les lecteurs de n'importe quel manga pour cet utilisateur jusqu'à ce qu'il décide de changer de sens de lecture pour la mettre en vertical... pour la verticale les pages doivent être scrollables  et pour l'horizontale pas besoin de boutons pour défiler de la gauche vers la droite pour SPÉCIFIER les mangas ou de la droite vers la gauche SPÉCIFIER pour les BD et comics, les pages doivent bougé juste en défilant l'écran avec le doigt ....
+‎
+‎et dans la messagerie privée on peut envoyer aussi des images importées depuis la galerie et on peut enregistrer vers notre galerie les images qui seront dans les commentaires, dans les messageries privées mais pas les chapitres des œuvres sur le site ....et aussi un peu liké les images qu'on s'envoie en privé dans la messagerie ...
+‎
+‎et chaque page d'un chapitre peut être liké individuellement et le chapitre aussi peut être liké en global 
+‎et si un auteur veut avoir un badge bleu de certification comme sur Facebook, il devrait versé 5 € au site chaque mois, c'est-à-dire moi le créateur sinon sa certification sera retiré 
+‎
+‎pour le thème du site je veux du sombre/clair changeable par l'utilisateur 
+‎
+‎― faisant en sorte qu'il est une option spécifique lors de l'inscription permettant de choisir d'être un auteur ( éditeur)  pour bénéficier des fonctionnalités quand on est auteur et de choisir d'être un lecteur ainsi pour ne pas avoir les mêmes fonctionnalités spécifiques à ceux qui publient de ceux qui sont des lecteurs 
+‎​"Améliore le système de notifications, la recherche et l'interface de MangaGramm avec les fonctionnalités suivantes :
+‎​Système de Notifications Complet : Fais en sorte qu'une notification apparaisse (comme pour les nouveaux chapitres) dans les cas suivants :
+‎​Réception d'un nouveau message privé.
+‎​Quand l'utilisateur est mentionné (@pseudo) dans un commentaire ou sur le site.
+‎​Quand quelqu'un réagit (Like) à son œuvre ou à son commentaire.
+‎​Quand quelqu'un répond à l'un de ses commentaires.
+‎​Recherche Universelle : Améliore la barre de recherche pour qu'elle soit capable de trouver à la fois des œuvres (mangas) et des personnes (auteurs/utilisateurs) dans le même champ de recherche.
+‎​Référencement (SEO) : Configure le site pour qu'en tapant 'MangaGramm.com' dans n'importe quel moteur de recherche (Google, Bing, etc.), le site apparaisse correctement. Ajoute les balises Meta nécessaires (Title, Description).
+‎​Correction de Bug : Le bouton 'Start Creating' ne fonctionne pas. Répare-le pour qu'il redirige vers l'interface de création.
+‎​Bouton de Partage Permanent : Ajoute en haut à droite un bouton 'Partager' visible à tout moment pour copier le lien du site ou de la page.
+‎​Stabilité : Assure-toi que toutes les notifications sont bien enregistrées en base de données."
+‎
+‎
+‎"Il y a un bug avec les photos de profil sur MangaGramm :
+‎Persistance de l'image : Actuellement, la photo de profil disparaît ou revient à une lettre par défaut quand on se déconnecte ou qu'on change de page. Fais en sorte que l'URL de l'image choisie par l'utilisateur soit sauvegardée de façon permanente dans la base de données (User Model).
+‎Affichage Global : La photo doit être visible partout sur le site :
+‎Sur la page de profil (image 1000059937.jpg).
+‎Dans la section 'Top Authors' de la page d'accueil (image 1000059938.jpg).
+‎Dans la barre de navigation en haut à droite quand on est connecté.
+‎Gestion du cache : Assure-toi que l'application recharge la nouvelle photo immédiatement après que l'utilisateur l'a modifiée sans avoir besoin de rafraîchir la page manuellement.
+‎Analyse du code : Vérifie si le problème vient du fait que le site utilise une image temporaire au lieu de stocker l'image sur un service de stockage (comme Cloudinary ou les assets de Replit)."
+‎
+‎Corrige le système de 'Likes' sur l'ensemble de la plateforme MangaGramm pour assurer une persistance totale :
+‎Sauvegarde en Base de Données : Fais en sorte que chaque 'Like' (sur les chapitres, les images, les commentaires et les réponses) soit immédiatement enregistré dans la base de données. Un utilisateur ne doit pas pouvoir liker deux fois le même contenu.
+‎Persistance au rafraîchissement : L'état du like (le cœur rempli ou coloré) doit rester visible même après s'être déconnecté/reconnecté ou après avoir rafraîchi la page.
+‎Compteur en temps réel : Assure-toi que le compteur de likes s'incrémente et se décrémente correctement pour tous les utilisateurs en temps réel (ou via une mise à jour rapide de l'interface).
+‎Notifications liées : Comme demandé précédemment, chaque nouveau like doit déclencher une notification pour l'auteur du contenu concerné.
+‎Vérification globale : Parcours tous les composants (Pages de lecture, Section commentaires, Profils) pour vérifier que le système de like utilise bien la même logique partout."
+‎
+‎Améliore la page d'accueil et le système de recommandations de MangaGramm :
+‎Fil d'Actualité Diversifié : Configure l'algorithme pour proposer des œuvres de tous les genres (Manga, Webtoon, Comics) de manière aléatoire et équilibrée dans le fil d'actualité pour favoriser la découverte.
+‎Classement Quotidien (Top 24h) : Ajoute une section 'Top du Jour' qui affiche automatiquement les œuvres les plus vues et lues au cours des dernières 24 heures.
+‎Suggestions d'Auteurs : Crée une section 'Auteurs à suivre'. Mets en avant de manière prioritaire les comptes liés aux adresses drussodan@gmail.com et mangagramm@gmail.com.
+‎Certification Spéciale (Badge Bleu) :
+‎Implémente un badge de certification bleu visible par tous sur les profils.
+‎Exception permanente : Les comptes drussodan@gmail.com et mangagramm@gmail.com doivent être certifiés automatiquement et à vie, sans jamais avoir à payer l'abonnement Premium.
+‎Pour les autres utilisateurs, le badge reste lié à l'abonnement de 4 €.
+‎Mise en avant des Genres : Ajoute des étiquettes claires (Manga, Comics, Webtoon) sur les miniatures des œuvres pour que les lecteurs sachent immédiatement ce qu'ils vont lire."
+‎
+‎Prompt : Système Économique, Classes et Règles
+‎"Configure le système monétaire et la progression des utilisateurs sur MangaGramm selon ces règles précises :
+‎Monnaie Virtuelle (Coins) :
+‎Implémente l'achat de Coins via FedaPay/CinetPay.
+‎Tarif : 100 FCFA = 20 Coins.
+‎Coût par chapitre : 1 Coin par chapitre premium (prix de base).
+‎Répartition des revenus : 70% pour l'auteur, 30% pour la plateforme.
+‎Progression des Auteurs (Classes) :
+‎Le prix d'un chapitre premium augmente automatiquement à chaque montée de classe.
+‎Passage en Classe 2 : Nécessite 1 000 vues cumulées.
+‎Classes suivantes : Le palier augmente de +3 000 vues à chaque fois (ex: 4 000 pour la Classe 3, 7 000 pour la Classe 4, etc.).
+‎Progression des Lecteurs & Réductions :
+‎Utiliser des Coins fait monter le lecteur en classe.
+‎Palier : 10 Coins dépensés = Passage à la classe supérieure.
+‎Réduction : Chaque montée de classe offre 1% de réduction cumulable sur l'achat des chapitres.
+‎Difficulté : Le nombre de Coins requis pour monter de classe doit augmenter de manière exponentielle à chaque niveau pour rendre la progression plus rude.
+‎Notifications de Succès :
+‎Envoie une notification automatique dès qu'un utilisateur change de classe.
+‎Message : 'Bravo Cher Lecteur/Auteur ! Vous venez de passer en Classe [Niveau]. Continuez ainsi !'
+‎Page des Règles (Fonctionnement) :
+‎Ajoute une option dans le menu nommé 'Règles de fonctionnement'.
+‎Cette page doit expliquer clairement aux auteurs comment ils gagnent de l'argent et comment monter de classe, ainsi qu'aux lecteurs comment obtenir des réductions.
+‎Interface : Affiche clairement la classe actuelle sur le profil (comme vu sur l'image 1000059937.jpg) et le solde de Coins dans le menu utilisateur."
+‎
+‎Prompt à utiliser sur Replit
+‎"Aide-moi à configurer mon projet pour qu'il soit accessible publiquement sans afficher l'écran 'Run this app'.
+‎Explique-moi comment garder le serveur actif (via un service comme 'UptimeRobot' ou en utilisant le mode 'WebView' de Replit) pour que mes utilisateurs arrivent directement sur MangaGramm.
+‎Intègre les clés API Paystack suivantes dans mon fichier de configuration (ou fichier .env) :
+‎PAYSTACK_PUBLIC_KEY: pk_test_159e6de8133411be5012fe89d36241d9674773a8
+‎PAYSTACK_SECRET_KEY: sk_test_539509f46086d77fcd9ca3d374005e6093247413
+‎Prépare une fonction simple pour gérer les paiements par Mobile Money et carte, afin que les utilisateurs puissent acheter des crédits sur le site sans erreurs de connexion."
+‎

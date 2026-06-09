@@ -6,16 +6,16 @@ import { grantXp, getClassForXp } from "./xp";
 
 const router: IRouter = Router();
 
-const CINETPAY_API_KEY = process.env.CINETPAY_API_KEY || "";
-const CINETPAY_SITE_ID = process.env.CINETPAY_SITE_ID || "";
+const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || "";
 const AUTHOR_SHARE = 0.70;
 
 export const COIN_PACKAGES = [
-  { id: "coins_50", coins: 50, xof: 500, label: "50 Coins", popular: false },
-  { id: "coins_120", coins: 120, xof: 1000, label: "120 Coins", popular: true },
-  { id: "coins_260", coins: 260, xof: 2000, label: "260 Coins", popular: false },
-  { id: "coins_700", coins: 700, xof: 5000, label: "700 Coins", popular: false },
-  { id: "coins_1500", coins: 1500, xof: 10000, label: "1500 Coins", popular: false },
+  { id: "coins_20", coins: 20, xof: 100, label: "20 Coins", popular: false },
+  { id: "coins_50", coins: 50, xof: 250, label: "50 Coins", popular: false },
+  { id: "coins_120", coins: 120, xof: 600, label: "120 Coins", popular: true },
+  { id: "coins_260", coins: 260, xof: 1300, label: "260 Coins", popular: false },
+  { id: "coins_700", coins: 700, xof: 3500, label: "700 Coins", popular: false },
+  { id: "coins_1500", coins: 1500, xof: 7500, label: "1500 Coins", popular: false },
 ];
 
 router.get("/payments/packages", (_req, res) => {
@@ -32,7 +32,7 @@ router.get("/payments/balance", requireAuth, async (req: Request, res: Response)
 });
 
 router.post("/payments/initiate", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const { packageId } = req.body;
+  const { packageId, email: emailOverride } = req.body;
   const userId = req.session.userId!;
 
   const pkg = COIN_PACKAGES.find((p) => p.id === packageId);
@@ -49,13 +49,13 @@ router.post("/payments/initiate", requireAuth, async (req: Request, res: Respons
     coinsGranted: pkg.coins,
     status: "pending",
     cinetpayTransactionId: transactionId,
-    metadata: { packageId, label: pkg.label },
+    metadata: { packageId, label: pkg.label, gateway: "paystack" },
   }).returning();
 
-  if (!CINETPAY_API_KEY || !CINETPAY_SITE_ID) {
+  if (!PAYSTACK_SECRET_KEY) {
     res.status(503).json({
       error: "payment_gateway_not_configured",
-      message: "Configurez CINETPAY_API_KEY et CINETPAY_SITE_ID.",
+      message: "Clé Paystack non configurée.",
       transactionId,
       txnId: txn.id,
     });
@@ -66,63 +66,101 @@ router.post("/payments/initiate", requireAuth, async (req: Request, res: Respons
     const domain = (process.env.REPLIT_DOMAINS || "").split(",")[0]?.trim();
     const base = domain ? `https://${domain}` : `http://localhost:80`;
 
+    const customerEmail = emailOverride || user.email || `${userId}@mangagramm.app`;
+    // Paystack amounts are in kobo for NGN, pesewas for GHS, or just the unit for XOF
+    // XOF is supported by Paystack (Côte d'Ivoire, Sénégal)
+    const amountInCents = pkg.xof * 100;
+
     const payload = {
-      apikey: CINETPAY_API_KEY,
-      site_id: CINETPAY_SITE_ID,
-      transaction_id: transactionId,
-      amount: pkg.xof,
-      currency: "XOF",
-      description: `MangaGramm - ${pkg.label}`,
-      return_url: `${base}/coins?status=success`,
-      notify_url: `${base}/api/payments/webhook/cinetpay`,
-      customer_name: user.displayName || user.username,
-      customer_email: user.email,
-      customer_phone_number: user.payoutNumber || "",
-      customer_address: "Abidjan, CI",
-      customer_city: "Abidjan",
-      customer_country: "CI",
-      customer_state: "CI",
-      customer_zip_code: "00225",
+      email: customerEmail,
+      amount: amountInCents,
+      currency: "GHS", // Paystack supports GHS (Ghana), NGN, ZAR, KES, USD — use GHS as proxy
+      reference: transactionId,
+      callback_url: `${base}/coins?status=success&ref=${transactionId}`,
+      metadata: {
+        user_id: userId,
+        package_id: packageId,
+        coins: pkg.coins,
+        txn_id: txn.id,
+        custom_fields: [
+          { display_name: "Coins", variable_name: "coins", value: pkg.coins },
+          { display_name: "Package", variable_name: "package", value: pkg.label },
+        ],
+      },
     };
 
-    const response = await fetch("https://api-checkout.cinetpay.com/v2/payment", {
+    const response = await fetch("https://api.paystack.co/transaction/initialize", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${PAYSTACK_SECRET_KEY}`,
+      },
       body: JSON.stringify(payload),
     });
 
     const data = await response.json() as any;
 
-    if (data.code === "201") {
-      await db.update(coinTransactionsTable)
-        .set({ cinetpayPaymentToken: data.data?.payment_token })
-        .where(eq(coinTransactionsTable.id, txn.id));
-      res.json({ paymentUrl: data.data?.payment_url, paymentToken: data.data?.payment_token, transactionId });
+    if (data.status === true && data.data?.authorization_url) {
+      res.json({
+        paymentUrl: data.data.authorization_url,
+        reference: transactionId,
+        txnId: txn.id,
+      });
     } else {
-      res.status(400).json({ error: "CinetPay error", details: data.message });
+      res.status(400).json({ error: "Paystack error", details: data.message });
     }
   } catch (err: any) {
-    console.error("CinetPay error:", err);
     res.status(500).json({ error: "Payment gateway error" });
   }
 });
 
-router.post("/payments/webhook/cinetpay", async (req: Request, res: Response): Promise<void> => {
-  const { cpm_trans_id, cpm_site_id } = req.body;
-  if (!cpm_trans_id) { res.status(400).json({ error: "Missing transaction ID" }); return; }
+router.get("/payments/verify/:reference", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const { reference } = req.params;
+  if (!PAYSTACK_SECRET_KEY) { res.status(503).json({ error: "Not configured" }); return; }
 
   try {
-    const verifyRes = await fetch("https://api-checkout.cinetpay.com/v2/payment/check", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ apikey: CINETPAY_API_KEY, site_id: cpm_site_id, transaction_id: cpm_trans_id }),
+    const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+      headers: { "Authorization": `Bearer ${PAYSTACK_SECRET_KEY}` },
     });
     const verifyData = await verifyRes.json() as any;
 
-    if (verifyData.data?.cpm_result !== "00") { res.json({ message: "Not successful" }); return; }
+    if (verifyData.status !== true || verifyData.data?.status !== "success") {
+      res.json({ verified: false, status: verifyData.data?.status });
+      return;
+    }
 
     const [txn] = await db.select().from(coinTransactionsTable)
-      .where(eq(coinTransactionsTable.cinetpayTransactionId, cpm_trans_id));
+      .where(eq(coinTransactionsTable.cinetpayTransactionId, reference));
+    if (!txn) { res.status(404).json({ error: "Transaction not found" }); return; }
+    if (txn.status === "confirmed") { res.json({ verified: true, alreadyProcessed: true }); return; }
+
+    await db.update(coinTransactionsTable)
+      .set({ status: "confirmed", confirmedAt: new Date() })
+      .where(eq(coinTransactionsTable.id, txn.id));
+
+    await db.update(usersTable)
+      .set({ coins: sql`${usersTable.coins} + ${txn.coinsGranted}` })
+      .where(eq(usersTable.id, txn.userId));
+
+    await grantXp(txn.userId, 5, "coin_purchase");
+
+    const [updatedUser] = await db.select({ coins: usersTable.coins }).from(usersTable).where(eq(usersTable.id, txn.userId));
+    res.json({ verified: true, coinsGranted: txn.coinsGranted, balance: updatedUser?.coins || 0 });
+  } catch (err) {
+    res.status(500).json({ error: "Verification error" });
+  }
+});
+
+router.post("/payments/webhook/paystack", async (req: Request, res: Response): Promise<void> => {
+  const event = req.body;
+  if (event.event !== "charge.success") { res.json({ message: "Ignored" }); return; }
+
+  const reference = event.data?.reference;
+  if (!reference) { res.status(400).json({ error: "Missing reference" }); return; }
+
+  try {
+    const [txn] = await db.select().from(coinTransactionsTable)
+      .where(eq(coinTransactionsTable.cinetpayTransactionId, reference));
     if (!txn || txn.status === "confirmed") { res.json({ message: "Already processed" }); return; }
 
     await db.update(coinTransactionsTable)
@@ -137,7 +175,6 @@ router.post("/payments/webhook/cinetpay", async (req: Request, res: Response): P
 
     res.json({ message: "Confirmed" });
   } catch (err) {
-    console.error("Webhook error:", err);
     res.status(500).json({ error: "Webhook error" });
   }
 });

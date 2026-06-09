@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { useTranslation } from "react-i18next";
 import { SUPPORTED_LANGUAGES } from "@/lib/i18n";
-import { Search, Bell, Menu, X, Sun, Moon, Monitor, User, LogOut, Settings, PenTool, Heart, History, MessageCircle } from "lucide-react";
+import { Search, Bell, Menu, X, Sun, Moon, Monitor, User, LogOut, Settings, PenTool, Heart, History, MessageCircle, ScrollText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -216,6 +216,9 @@ export function Navbar() {
                   )}
                   <DropdownMenuItem onClick={() => setLocation("/settings")} data-testid="menu-settings">
                     <Settings className="w-4 h-4 mr-2" /> {t("settings")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setLocation("/rules")} data-testid="menu-rules">
+                    <ScrollText className="w-4 h-4 mr-2" /> Règles de fonctionnement
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={logout} data-testid="menu-logout">

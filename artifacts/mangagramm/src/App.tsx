@@ -23,6 +23,7 @@ import Login from "@/pages/login";
 import CoinsPage from "@/pages/coins";
 import PayoutsPage from "@/pages/payouts";
 import MessagesPage from "@/pages/messages";
+import RulesPage from "@/pages/rules";
 import NotFound from "@/pages/not-found";
 import { SplashScreen } from "@/components/splash-screen";
 
@@ -55,6 +56,7 @@ function Router() {
       <Route path="/messages" component={MessagesPage} />
       <Route path="/messages/:threadId" component={MessagesPage} />
       <Route path="/login" component={Login} />
+      <Route path="/rules" component={RulesPage} />
       <Route component={NotFound} />
     </Switch>
   );

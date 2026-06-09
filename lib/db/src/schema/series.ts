@@ -3,7 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
 
-export const seriesTypeEnum = pgEnum("series_type", ["manga", "webtoon", "comic"]);
+export const seriesTypeEnum = pgEnum("series_type", ["manga", "webtoon", "comic", "light-novel"]);
 export const seriesStatusEnum = pgEnum("series_status", ["ongoing", "completed", "hiatus"]);
 
 export const seriesTable = pgTable("series", {

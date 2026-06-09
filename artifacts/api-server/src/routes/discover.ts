@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, sql, desc } from "drizzle-orm";
+import { eq, sql, desc, gte, and } from "drizzle-orm";
 import { db, seriesTable, chaptersTable, usersTable, genresTable, followsTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -87,6 +87,76 @@ router.get("/discover/top-authors", async (req, res): Promise<void> => {
   }));
 
   res.json(authorsWithStats);
+});
+
+router.get("/discover/top24h", async (req, res): Promise<void> => {
+  const limit = parseInt(String(req.query.limit || "8"), 10);
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  const recentChapters = await db.select({ seriesId: chaptersTable.seriesId })
+    .from(chaptersTable)
+    .where(gte(chaptersTable.createdAt, since));
+
+  const recentSeriesIds = [...new Set(recentChapters.map(c => c.seriesId))];
+
+  let top: any[];
+  if (recentSeriesIds.length > 0) {
+    top = await db.select().from(seriesTable)
+      .where(sql`${seriesTable.id} = ANY(${recentSeriesIds})`)
+      .orderBy(desc(seriesTable.viewCount))
+      .limit(limit);
+  } else {
+    top = await db.select().from(seriesTable).orderBy(desc(seriesTable.viewCount)).limit(limit);
+  }
+
+  const result = await Promise.all(top.map(async (s) => {
+    const [author] = await db.select().from(usersTable).where(eq(usersTable.id, s.authorId));
+    const [chapterCount] = await db.select({ count: sql<number>`count(*)::int` }).from(chaptersTable).where(eq(chaptersTable.seriesId, s.id));
+    return {
+      ...s,
+      authorName: author?.displayName || author?.username || "Unknown",
+      authorAvatar: author?.avatar || null,
+      chapterCount: chapterCount?.count || 0,
+    };
+  }));
+
+  res.json(result);
+});
+
+const FEATURED_EMAILS = ["drussodan@gmail.com", "mangagramm@gmail.com"];
+
+router.get("/discover/featured-authors", async (req, res): Promise<void> => {
+  const limit = parseInt(String(req.query.limit || "6"), 10);
+
+  const allAuthors = await db.select().from(usersTable).where(eq(usersTable.role, "author")).limit(50);
+
+  const withStats = await Promise.all(allAuthors.map(async (a) => {
+    const [seriesCount] = await db.select({ count: sql<number>`count(*)::int` }).from(seriesTable).where(eq(seriesTable.authorId, a.id));
+    const [followersCountResult] = await db.select({ count: sql<number>`count(*)::int` }).from(followsTable).where(eq(followsTable.followingId, a.id));
+    const [totalViews] = await db.select({ total: sql<number>`coalesce(sum(view_count), 0)::int` }).from(seriesTable).where(eq(seriesTable.authorId, a.id));
+    const isFeatured = FEATURED_EMAILS.includes(a.email || "");
+    return {
+      id: a.id,
+      username: a.username,
+      displayName: a.displayName,
+      avatar: a.avatar,
+      bio: a.bio,
+      role: a.role,
+      verified: (a as any).verified || isFeatured,
+      featured: isFeatured,
+      seriesCount: seriesCount?.count || 0,
+      followersCount: followersCountResult?.count || 0,
+      totalViews: totalViews?.total || 0,
+    };
+  }));
+
+  withStats.sort((a, b) => {
+    if (a.featured && !b.featured) return -1;
+    if (!a.featured && b.featured) return 1;
+    return b.totalViews - a.totalViews;
+  });
+
+  res.json(withStats.slice(0, limit));
 });
 
 router.get("/discover/stats", async (_req, res): Promise<void> => {

@@ -20,7 +20,7 @@ function CreateSeriesForm() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [type, setType] = useState<"manga" | "webtoon" | "comic">("manga");
+  const [type, setType] = useState<"manga" | "webtoon" | "comic" | "light-novel">("manga");
   const [coverImage, setCoverImage] = useState("");
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [mature, setMature] = useState(false);
@@ -85,12 +85,13 @@ function CreateSeriesForm() {
             </div>
             <div className="space-y-2">
               <Label>Type *</Label>
-              <Select value={type} onValueChange={(v) => setType(v as "manga" | "webtoon" | "comic")}>
+              <Select value={type} onValueChange={(v) => setType(v as "manga" | "webtoon" | "comic" | "light-novel")}>
                 <SelectTrigger data-testid="select-type"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="manga">Manga</SelectItem>
-                  <SelectItem value="webtoon">Webtoon</SelectItem>
-                  <SelectItem value="comic">Comic</SelectItem>
+                  <SelectItem value="manga">🇯🇵 Manga</SelectItem>
+                  <SelectItem value="webtoon">🇰🇷 Webtoon</SelectItem>
+                  <SelectItem value="comic">🦸 Comics</SelectItem>
+                  <SelectItem value="light-novel">📖 Light Novel</SelectItem>
                 </SelectContent>
               </Select>
             </div>
