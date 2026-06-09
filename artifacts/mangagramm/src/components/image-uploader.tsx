@@ -65,7 +65,7 @@ export function ImageUploader({ label, currentUrl, onUpload, aspect = "cover", a
       const servingPath = `/api/storage${objectPath}`;
       setPreview(servingPath);
       onUpload(servingPath, servingPath);
-    } catch (err) {
+    } catch {
       setError("Échec de l'upload");
       setPreview(null);
       onUpload("", "");
@@ -140,26 +140,41 @@ export function ImageUploader({ label, currentUrl, onUpload, aspect = "cover", a
   );
 }
 
-/* ─── MultiPageUploader ─────────────────────────────────────────
-   Bug fix: stale closure — uploadFile captured stale `pages` prop.
-   Fix: pagesRef always mirrors latest pages synchronously.
-──────────────────────────────────────────────────────────────── */
+/* ─── Types ──────────────────────────────────────────────────── */
+type PageItem = { url: string; preview?: string };
+type PagesUpdater = PageItem[] | ((prev: PageItem[]) => PageItem[]);
+
 interface MultiPageUploaderProps {
-  pages: { url: string; preview?: string }[];
-  onPagesChange: (pages: { url: string; preview?: string }[]) => void;
+  pages: PageItem[];
+  /**
+   * Accepte soit un nouveau tableau, soit une mise à jour fonctionnelle
+   * (prev) => next — identique à React setState.
+   * Passer directement `setPages` depuis le composant parent.
+   */
+  onPagesChange: (updater: PagesUpdater) => void;
 }
 
+/* ─── MultiPageUploader ─────────────────────────────────────────
+   Fix race condition: toutes les mises à jour utilisent des updaters
+   fonctionnels `(prev) => next` pour éviter que des uploads parallèles
+   ne s'écrasent mutuellement (problème de closure/stale state).
+   L'ordre des pages est GARANTI car chaque upload cible son index précis.
+──────────────────────────────────────────────────────────────── */
 export function MultiPageUploader({ pages, onPagesChange }: MultiPageUploaderProps) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState<Set<number>>(new Set());
   const [errors, setErrors] = useState<Record<number, string>>({});
 
-  // ✅ Always mirrors latest pages — fixes stale closure bug
-  const pagesRef = useRef(pages);
-  pagesRef.current = pages;
-
   const uploadFile = async (file: File, index: number) => {
+    // Créer un aperçu local immédiat pour affichage instantané
+    const localPreview = URL.createObjectURL(file);
+    onPagesChange((prev) => {
+      const next = [...prev];
+      next[index] = { url: "", preview: localPreview };
+      return next;
+    });
+
     setUploading((prev) => new Set(prev).add(index));
     setErrors((prev) => { const e = { ...prev }; delete e[index]; return e; });
 
@@ -173,24 +188,33 @@ export function MultiPageUploader({ pages, onPagesChange }: MultiPageUploaderPro
       if (!metaRes.ok) throw new Error("URL d'upload introuvable");
       const { uploadURL, objectPath } = await metaRes.json();
 
-      await fetch(uploadURL, {
+      const uploadRes = await fetch(uploadURL, {
         method: "PUT",
         body: file,
         headers: { "Content-Type": file.type },
       });
+      if (!uploadRes.ok) throw new Error(`Upload HTTP ${uploadRes.status}`);
 
       const servingPath = `/api/storage${objectPath}`;
 
-      // ✅ Read from ref (latest pages), not stale closure
-      const newPages = [...pagesRef.current];
-      newPages[index] = { url: servingPath, preview: servingPath };
-      onPagesChange(newPages);
-    } catch (err) {
+      // ✅ Mise à jour fonctionnelle : lit TOUJOURS le state le plus récent
+      // → zéro race condition même si N uploads finissent simultanément
+      onPagesChange((prev) => {
+        const next = [...prev];
+        next[index] = { url: servingPath, preview: servingPath };
+        return next;
+      });
+
+      // Libérer l'URL blob
+      URL.revokeObjectURL(localPreview);
+    } catch {
       setErrors((prev) => ({ ...prev, [index]: "Échec" }));
-      // Keep placeholder but mark as failed
-      const newPages = [...pagesRef.current];
-      newPages[index] = { url: "", preview: "" };
-      onPagesChange(newPages);
+      onPagesChange((prev) => {
+        const next = [...prev];
+        next[index] = { url: "", preview: "" };
+        return next;
+      });
+      URL.revokeObjectURL(localPreview);
     } finally {
       setUploading((prev) => { const s = new Set(prev); s.delete(index); return s; });
     }
@@ -200,27 +224,41 @@ export function MultiPageUploader({ pages, onPagesChange }: MultiPageUploaderPro
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
     if (imageFiles.length === 0) return;
 
-    const startIndex = pagesRef.current.length;
-    // Add placeholders immediately so the UI shows the incoming pages
-    const withPlaceholders = [...pagesRef.current, ...imageFiles.map(() => ({ url: "" }))];
-    onPagesChange(withPlaceholders);
+    // Déterminer startIndex AVANT d'ajouter les placeholders
+    let startIndex = 0;
+    onPagesChange((prev) => {
+      startIndex = prev.length;
+      // Ajouter les placeholders à la fin, dans l'ordre exact de sélection
+      return [...prev, ...imageFiles.map(() => ({ url: "", preview: "" }))];
+    });
 
-    // Start all uploads in parallel — each reads from pagesRef (always current)
-    imageFiles.forEach((file, i) => uploadFile(file, startIndex + i));
+    // Lancer les uploads en parallèle APRÈS le tick React
+    // On passe index explicitement → chaque upload sait exactement où écrire
+    setTimeout(() => {
+      imageFiles.forEach((file, i) => uploadFile(file, startIndex + i));
+    }, 0);
   };
 
   const removePage = (index: number) => {
-    onPagesChange(pagesRef.current.filter((_, i) => i !== index));
+    onPagesChange((prev) => prev.filter((_, i) => i !== index));
+    setErrors((prev) => {
+      const e = { ...prev };
+      delete e[index];
+      return e;
+    });
   };
 
   const movePage = (from: number, to: number) => {
-    const newPages = [...pagesRef.current];
-    const [moved] = newPages.splice(from, 1);
-    newPages.splice(to, 0, moved);
-    onPagesChange(newPages);
+    onPagesChange((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
   };
 
   const uploadingCount = uploading.size;
+  const readyCount = pages.filter((p) => p.url).length;
 
   return (
     <div className="space-y-3">
@@ -229,6 +267,7 @@ export function MultiPageUploader({ pages, onPagesChange }: MultiPageUploaderPro
         <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted rounded-lg px-3 py-2">
           <Loader2 className="w-4 h-4 animate-spin shrink-0" />
           <span>Upload en cours : {uploadingCount} image{uploadingCount > 1 ? "s" : ""}…</span>
+          <span className="ml-auto text-xs">{readyCount}/{pages.length} prêtes</span>
         </div>
       )}
 
@@ -238,20 +277,31 @@ export function MultiPageUploader({ pages, onPagesChange }: MultiPageUploaderPro
           <div key={i} className="relative group" data-testid={`page-thumb-${i}`}>
             <div className="aspect-[2/3] rounded-lg bg-muted overflow-hidden border border-border">
               {uploading.has(i) ? (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-1">
-                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                  <span className="text-[10px] text-muted-foreground">Upload…</span>
-                </div>
+                /* Pendant l'upload : afficher l'aperçu local si dispo */
+                page.preview ? (
+                  <div className="relative w-full h-full">
+                    <img src={page.preview} alt={`Page ${i + 1}`} className="w-full h-full object-cover opacity-60" />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/30">
+                      <Loader2 className="w-5 h-5 animate-spin text-white" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-1">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                    <span className="text-[10px] text-muted-foreground">Upload…</span>
+                  </div>
+                )
               ) : errors[i] ? (
                 <div className="w-full h-full flex flex-col items-center justify-center gap-1 bg-destructive/10">
                   <X className="w-5 h-5 text-destructive" />
                   <span className="text-[10px] text-destructive">Erreur</span>
                 </div>
-              ) : page.preview || page.url ? (
+              ) : page.url ? (
                 <img
-                  src={page.preview || page.url}
+                  src={page.url}
                   alt={`Page ${i + 1}`}
                   className="w-full h-full object-cover"
+                  loading="lazy"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
@@ -265,7 +315,7 @@ export function MultiPageUploader({ pages, onPagesChange }: MultiPageUploaderPro
               {i + 1}
             </span>
 
-            {/* Controls — always visible on mobile, hover on desktop */}
+            {/* Controls — hover on desktop, visible on mobile */}
             {!uploading.has(i) && (
               <div className="absolute top-1 right-1 flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 sm:transition-opacity">
                 {i > 0 && (
@@ -325,8 +375,11 @@ export function MultiPageUploader({ pages, onPagesChange }: MultiPageUploaderPro
 
       {pages.length > 0 && (
         <p className="text-xs text-muted-foreground">
-          {pages.filter(p => p.url).length}/{pages.length} page{pages.length > 1 ? "s" : ""} prête{pages.filter(p => p.url).length > 1 ? "s" : ""}
-          {uploadingCount > 0 && <span className="text-yellow-500 ml-1"> (upload en cours…)</span>}
+          {readyCount}/{pages.length} page{pages.length > 1 ? "s" : ""} prête{readyCount > 1 ? "s" : ""}
+          {uploadingCount > 0 && <span className="text-yellow-500 ml-2">⏳ upload en cours…</span>}
+          {uploadingCount === 0 && readyCount < pages.length && (
+            <span className="text-destructive ml-2">⚠ {pages.length - readyCount} image{pages.length - readyCount > 1 ? "s" : ""} en échec — supprimez-les</span>
+          )}
         </p>
       )}
     </div>

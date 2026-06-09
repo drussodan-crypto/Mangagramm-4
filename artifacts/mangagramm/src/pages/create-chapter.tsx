@@ -30,9 +30,18 @@ function CreateChapterForm() {
     query: { enabled: !!sId, queryKey: getGetSeriesQueryKey(sId) },
   });
 
+  // Vrai si au moins une page est en cours d'upload (url vide mais preview présent)
+  const hasUploadingPages = pages.some((p) => !p.url);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!number || !title) return;
+
+    if (hasUploadingPages) {
+      toast({ title: "Upload en cours", description: "Attendez que toutes les images soient uploadées avant de publier.", variant: "destructive" });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -55,13 +64,15 @@ function CreateChapterForm() {
 
       const chapter = await chapterRes.json();
 
-      const validPages = pages.filter((p) => p.url.trim());
+      // Envoyer uniquement les pages avec url valide, dans l'ordre du tableau
+      const validPages = pages.filter((p) => p.url && p.url.trim());
       if (validPages.length > 0) {
         const pagesRes = await fetch(`/api/chapters/${chapter.id}/pages`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
+            // pageNumber commence à 1, ordre exact du tableau
             pages: validPages.map((p, i) => ({ pageNumber: i + 1, imageUrl: p.url })),
           }),
         });
@@ -69,7 +80,7 @@ function CreateChapterForm() {
         if (!pagesRes.ok) throw new Error("Erreur lors de l'ajout des pages");
       }
 
-      toast({ title: "Chapitre créé !", description: `Chapitre ${number} "${title}" ${isPremium ? `— Premium (${coinPrice} Coins)` : ""} ajouté.` });
+      toast({ title: "Chapitre créé !", description: `Chapitre ${number} "${title}" ${isPremium ? `— Premium (${coinPrice} Coins)` : ""} — ${validPages.length} page${validPages.length > 1 ? "s" : ""} ajoutée${validPages.length > 1 ? "s" : ""}.` });
       setLocation(`/series/${sId}`);
     } catch (err: any) {
       toast({ title: "Erreur", description: err.message, variant: "destructive" });
@@ -141,9 +152,17 @@ function CreateChapterForm() {
           )}
         </div>
 
-        <Button type="submit" className="w-full" disabled={isSubmitting || !number || !title} data-testid="button-submit-chapter">
-          {isSubmitting ? "Création en cours..." : t("add_chapter")}
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={isSubmitting || !number || !title || hasUploadingPages}
+          data-testid="button-submit-chapter"
+        >
+          {isSubmitting ? "Création en cours…" : hasUploadingPages ? "⏳ Upload en cours…" : t("add_chapter")}
         </Button>
+        {hasUploadingPages && (
+          <p className="text-xs text-center text-yellow-500">Patienter que toutes les images soient chargées.</p>
+        )}
       </form>
     </div>
   );
