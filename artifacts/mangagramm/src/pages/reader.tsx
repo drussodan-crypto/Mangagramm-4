@@ -6,13 +6,94 @@ import { ReactionPicker } from "@/components/reaction-picker";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, ChevronRight, MessageCircle, ArrowLeft, BookOpen, Lock, LayoutList, Rows, Send, Heart, Reply, Pencil, Trash2, Image as ImageIcon, X, Check } from "lucide-react";
+import {
+  ChevronLeft, ChevronRight, MessageCircle, ArrowLeft, BookOpen, Lock,
+  LayoutList, Rows, Send, Heart, Reply, Pencil, Trash2, Image as ImageIcon, X, Check,
+} from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getClassForXp } from "@/components/class-badge";
 import { useToast } from "@/hooks/use-toast";
 import { ProfileAvatar } from "@/components/profile-avatar";
 import { cn } from "@/lib/utils";
 
+/* ─── Per-page reaction constants ───────────────────────────── */
+const EMOJIS = [
+  { type: "like",  emoji: "👍" },
+  { type: "love",  emoji: "❤️" },
+  { type: "haha",  emoji: "😂" },
+  { type: "wow",   emoji: "😮" },
+  { type: "sad",   emoji: "😢" },
+  { type: "angry", emoji: "😡" },
+] as const;
+
+type PageReactionMap = Record<number, { counts: Record<string, number>; myReaction: string | null; total: number }>;
+
+/* ─── PageReactionBar ─────────────────────────────────────────
+   Barre de réactions style Facebook sous chaque page du chapitre.
+   Affiche les 3 emojis les plus populaires + compteur à gauche,
+   et les 6 boutons de réaction à droite (toujours visibles).
+──────────────────────────────────────────────────────────────── */
+function PageReactionBar({
+  pageId,
+  reactions,
+  onReact,
+}: {
+  pageId: number;
+  reactions?: PageReactionMap[number];
+  onReact: (pageId: number, type: string) => void;
+}) {
+  const counts = reactions?.counts ?? {};
+  const myReaction = reactions?.myReaction ?? null;
+  const total = reactions?.total ?? 0;
+
+  const topEmojis = [...EMOJIS]
+    .filter((e) => (counts[e.type] ?? 0) > 0)
+    .sort((a, b) => (counts[b.type] ?? 0) - (counts[a.type] ?? 0))
+    .slice(0, 3);
+
+  return (
+    <div className="flex items-center justify-between px-3 py-2 bg-zinc-900/80 border-t border-white/5">
+      {/* Left: top emojis + count */}
+      <div className="flex items-center gap-1.5 min-w-0">
+        {topEmojis.length > 0 && (
+          <span className="flex -space-x-0.5">
+            {topEmojis.map((e) => (
+              <span key={e.type} className="text-base leading-none">{e.emoji}</span>
+            ))}
+          </span>
+        )}
+        {total > 0 && (
+          <span className="text-xs text-gray-400 tabular-nums">{total}</span>
+        )}
+        {total === 0 && (
+          <span className="text-[11px] text-gray-600 italic">Réagir à cette page</span>
+        )}
+      </div>
+
+      {/* Right: 6 reaction buttons */}
+      <div className="flex items-center gap-0.5">
+        {EMOJIS.map((e) => (
+          <button
+            key={e.type}
+            onClick={() => onReact(pageId, e.type)}
+            className={cn(
+              "text-base leading-none p-1 rounded transition-all duration-100 active:scale-125 select-none",
+              myReaction === e.type
+                ? "scale-110 drop-shadow-[0_0_6px_rgba(255,255,255,0.5)]"
+                : "opacity-70 hover:opacity-100 hover:scale-110"
+            )}
+            title={e.type}
+            aria-label={e.type}
+          >
+            {e.emoji}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Reader ─────────────────────────────────────────────────── */
 export default function Reader() {
   const { chapterId } = useParams<{ chapterId: string }>();
   const cId = parseInt(chapterId || "0", 10);
@@ -28,13 +109,19 @@ export default function Reader() {
   const [currentPage, setCurrentPage] = useState(0);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
-  const [reactionData, setReactionData] = useState<{ total: number; counts: Record<string, number>; myReaction: string | null }>({ total: 0, counts: {}, myReaction: null });
+
+  // Chapter-level reactions
+  const [reactionData, setReactionData] = useState<{
+    total: number; counts: Record<string, number>; myReaction: string | null;
+  }>({ total: 0, counts: {}, myReaction: null });
+
+  // Per-page reactions: pageId → {counts, myReaction, total}
+  const [pageReactions, setPageReactions] = useState<PageReactionMap>({});
 
   const { data: chapter, isLoading } = useGetChapter(cId, {
     query: { enabled: !!cId, queryKey: getGetChapterQueryKey(cId) },
   });
 
-  // Comments always loaded — visible to everyone
   const { data: commentsData } = useGetChapterComments(cId, {
     query: { enabled: !!cId, queryKey: getGetChapterCommentsQueryKey(cId) },
   });
@@ -72,7 +159,7 @@ export default function Reader() {
     }
   }, [cId, isAuthenticated, isUnlocked]);
 
-  // Reactions
+  // Chapter-level reactions
   useEffect(() => {
     if (!cId) return;
     fetch(`/api/reactions?targetType=chapter&targetId=${cId}`, { credentials: "include" })
@@ -81,12 +168,21 @@ export default function Reader() {
       .catch(() => {});
   }, [cId]);
 
+  // Per-page reactions — batch load in one request
+  useEffect(() => {
+    if (!cId || !isUnlocked || pages.length === 0) return;
+    fetch(`/api/reactions/page-reactions?chapterId=${cId}`, { credentials: "include" })
+      .then((r) => r.ok ? r.json() : {})
+      .then((data: PageReactionMap) => setPageReactions(data))
+      .catch(() => {});
+  }, [cId, isUnlocked, pages.length]);
+
   // Keyboard nav in paged mode
   useEffect(() => {
     if (mode !== "paged" || pages.length === 0) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "ArrowRight" || e.key === "ArrowDown") setCurrentPage((p) => Math.min(p + 1, pages.length - 1));
-      if (e.key === "ArrowLeft" || e.key === "ArrowUp") setCurrentPage((p) => Math.max(p - 1, 0));
+      if (e.key === "ArrowLeft"  || e.key === "ArrowUp")   setCurrentPage((p) => Math.max(p - 1, 0));
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -126,6 +222,7 @@ export default function Reader() {
     }
   };
 
+  // Chapter-level reaction
   const handleReact = useCallback(async (reactionType: string) => {
     const res = await fetch("/api/reactions/toggle", {
       method: "POST",
@@ -138,6 +235,48 @@ export default function Reader() {
       setReactionData({ total: data.total, counts: data.counts, myReaction: data.myReaction });
     }
   }, [cId]);
+
+  // Per-page reaction with optimistic update
+  const handlePageReact = useCallback(async (pageId: number, reactionType: string) => {
+    if (!isAuthenticated) {
+      toast({ title: "Connexion requise", description: "Connectez-vous pour réagir aux pages." });
+      return;
+    }
+
+    // Optimistic update
+    setPageReactions((prev) => {
+      const current = prev[pageId] ?? { counts: {}, myReaction: null, total: 0 };
+      const wasMine = current.myReaction === reactionType;
+      const prevMine = current.myReaction;
+      const newCounts = { ...current.counts };
+
+      // Remove previous reaction if switching
+      if (prevMine) newCounts[prevMine] = Math.max(0, (newCounts[prevMine] ?? 0) - 1);
+      // Add new reaction unless toggling same one off
+      if (!wasMine) newCounts[reactionType] = (newCounts[reactionType] ?? 0) + 1;
+
+      const newTotal = Object.values(newCounts).reduce((s, v) => s + v, 0);
+      return {
+        ...prev,
+        [pageId]: { counts: newCounts, myReaction: wasMine ? null : reactionType, total: newTotal },
+      };
+    });
+
+    // Server sync
+    const res = await fetch("/api/reactions/toggle", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ targetType: "page", targetId: pageId, reactionType }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setPageReactions((prev) => ({
+        ...prev,
+        [pageId]: { counts: data.counts, myReaction: data.myReaction, total: data.total },
+      }));
+    }
+  }, [isAuthenticated, toast]);
 
   const [commentImageUrl, setCommentImageUrl] = useState<string | null>(null);
   const [uploadingCommentImage, setUploadingCommentImage] = useState(false);
@@ -225,8 +364,6 @@ export default function Reader() {
       body: JSON.stringify({ targetType: "comment", targetId: commentId }),
     });
     if (res.ok) {
-      const data = await res.json();
-      // Sync deltas so display stays accurate
       setLikeDeltas(prev => {
         const next = new Map(prev);
         next.delete(commentId);
@@ -255,7 +392,6 @@ export default function Reader() {
   const needsUnlock = isPremium && !isUnlocked;
 
   return (
-    /* Full-screen reader — owns its own scroll context */
     <div className="fixed inset-0 bg-black z-[60] flex flex-col" data-testid="page-reader">
 
       {/* ── TOP BAR ── */}
@@ -285,12 +421,16 @@ export default function Reader() {
           <Button
             variant="ghost" size="icon" className="h-8 w-8 text-white hover:bg-white/10"
             onClick={() => { setMode(m => m === "scroll" ? "paged" : "scroll"); setCurrentPage(0); }}
-            title={mode === "scroll" ? "Passer en mode page par page" : "Passer en mode défilement"}
+            title={mode === "scroll" ? "Mode page par page" : "Mode défilement"}
           >
             {mode === "scroll" ? <Rows className="w-4 h-4" /> : <LayoutList className="w-4 h-4" />}
           </Button>
 
-          <ReactionPicker targetType="chapter" targetId={cId} total={reactionData.total} myReaction={reactionData.myReaction} counts={reactionData.counts} onReact={handleReact} compact />
+          <ReactionPicker
+            targetType="chapter" targetId={cId}
+            total={reactionData.total} myReaction={reactionData.myReaction} counts={reactionData.counts}
+            onReact={handleReact} compact
+          />
         </div>
       </div>
 
@@ -336,18 +476,30 @@ export default function Reader() {
             <p className="text-sm">Aucune page dans ce chapitre.</p>
           </div>
 
-        /* ── SCROLL MODE — all pages stacked vertically ── */
+        /* ── SCROLL MODE — Facebook style: chaque page = une carte avec réactions ── */
         ) : mode === "scroll" ? (
           <div className="w-full">
             {pages.map((p: any, i: number) => (
-              <div key={p.id ?? i} className="w-full" data-testid={`page-${p.pageNumber}`}>
+              <div
+                key={p.id ?? i}
+                className="w-full max-w-2xl mx-auto mb-2 last:mb-0"
+                data-testid={`page-${p.pageNumber}`}
+              >
+                {/* Page image — full width, no gap between image and bar */}
                 <img
                   src={p.imageUrl}
                   alt={`Page ${p.pageNumber}`}
-                  className="w-full max-w-2xl mx-auto block"
+                  className="w-full block"
                   style={{ height: "auto" }}
                   loading={i < 3 ? "eager" : "lazy"}
                   decoding="async"
+                />
+
+                {/* ── Reaction bar — collée sous l'image comme Facebook ── */}
+                <PageReactionBar
+                  pageId={p.id}
+                  reactions={pageReactions[p.id]}
+                  onReact={handlePageReact}
                 />
               </div>
             ))}
@@ -385,26 +537,39 @@ export default function Reader() {
           <div className="flex flex-col min-h-full">
             <div className="relative flex-1 flex justify-center items-start">
               {pages[currentPage] && (
-                <img
-                  src={pages[currentPage].imageUrl}
-                  alt={`Page ${pages[currentPage].pageNumber}`}
-                  className="max-w-2xl w-full block"
-                  style={{ minHeight: "50vh", objectFit: "contain" }}
-                  data-testid={`page-${pages[currentPage].pageNumber}`}
-                />
+                <>
+                  <img
+                    src={pages[currentPage].imageUrl}
+                    alt={`Page ${pages[currentPage].pageNumber}`}
+                    className="max-w-2xl w-full block"
+                    style={{ minHeight: "50vh", objectFit: "contain" }}
+                    data-testid={`page-${pages[currentPage].pageNumber}`}
+                  />
+                  {/* Tap zones */}
+                  <button
+                    className="absolute left-0 top-0 h-full w-1/3 z-10 cursor-w-resize"
+                    onClick={() => setCurrentPage((p) => Math.max(p - 1, 0))}
+                    aria-label="Page précédente"
+                  />
+                  <button
+                    className="absolute right-0 top-0 h-full w-1/3 z-10 cursor-e-resize"
+                    onClick={() => setCurrentPage((p) => Math.min(p + 1, pages.length - 1))}
+                    aria-label="Page suivante"
+                  />
+                </>
               )}
-              {/* Tap zones */}
-              <button
-                className="absolute left-0 top-0 h-full w-1/3 z-10 cursor-w-resize"
-                onClick={() => setCurrentPage((p) => Math.max(p - 1, 0))}
-                aria-label="Page précédente"
-              />
-              <button
-                className="absolute right-0 top-0 h-full w-1/3 z-10 cursor-e-resize"
-                onClick={() => setCurrentPage((p) => Math.min(p + 1, pages.length - 1))}
-                aria-label="Page suivante"
-              />
             </div>
+
+            {/* Reaction bar in paged mode too */}
+            {pages[currentPage] && (
+              <div className="max-w-2xl w-full mx-auto">
+                <PageReactionBar
+                  pageId={pages[currentPage].id}
+                  reactions={pageReactions[pages[currentPage].id]}
+                  onReact={handlePageReact}
+                />
+              </div>
+            )}
 
             {/* Bottom nav bar */}
             <div className="sticky bottom-0 w-full flex items-center justify-between gap-2 px-3 py-2 bg-black/90 backdrop-blur border-t border-white/10">
@@ -578,7 +743,7 @@ export default function Reader() {
                           </>
                         )}
 
-                        {/* Actions */}
+                        {/* Comment actions */}
                         <div className="flex items-center gap-3 mt-1.5">
                           <button
                             onClick={() => handleLikeComment(cm.id)}
