@@ -1,7 +1,7 @@
 import { useGetTrending, useGetLatestUpdates, useGetTopAuthors, useGetPlatformStats } from "@workspace/api-client-react";
 import { SeriesCard } from "@/components/series-card";
 import { Link, useLocation } from "wouter";
-import { TrendingUp, Clock, Users, BookOpen, Eye, ArrowRight, Flame, BadgeCheck } from "lucide-react";
+import { TrendingUp, Clock, Users, BookOpen, Eye, ArrowRight, Flame, BadgeCheck, Heart, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -223,54 +223,65 @@ export default function Home() {
             <h2 className="text-xl font-semibold">Auteurs à suivre</h2>
           </div>
         </div>
-        {featuredAuthors.length > 0 ? (
+        {authorsLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {featuredAuthors.map((a: any) => (
+            {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {(featuredAuthors.length > 0 ? featuredAuthors : (topAuthors as any[]) || []).map((a: any, rank: number) => (
               <Link key={a.id} href={`/profile/${a.id}`} data-testid={`featured-author-${a.id}`}>
-                <div className="flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-accent/50 transition-colors cursor-pointer">
+                <div className="relative flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-accent/50 transition-colors cursor-pointer">
+                  {/* Rank badge */}
+                  <div className={`absolute -top-2 -left-2 z-10 w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shadow ${
+                    rank === 0 ? "bg-yellow-500 text-black" : rank === 1 ? "bg-zinc-400 text-black" : rank === 2 ? "bg-amber-700 text-white" : "bg-muted text-muted-foreground"
+                  }`}>
+                    {rank + 1}
+                  </div>
+
                   <Avatar className="h-12 w-12 shrink-0">
                     {a.avatar && <AvatarImage src={a.avatar} alt={a.displayName || a.username} />}
                     <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-lg">
                       {(a.displayName || a.username || "?").charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
+
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 mb-0.5">
                       <p className="text-sm font-semibold truncate">{a.displayName || a.username}</p>
                       {a.verified && <BadgeCheck className="w-4 h-4 text-blue-500 shrink-0" />}
-                      {a.featured && <span className="text-[10px] bg-yellow-500/20 text-yellow-500 border border-yellow-500/30 px-1.5 rounded-full">Fondateur</span>}
+                      {a.featured && <span className="text-[10px] bg-yellow-500/20 text-yellow-500 border border-yellow-500/30 px-1.5 rounded-full shrink-0">Fondateur</span>}
                     </div>
-                    <p className="text-xs text-muted-foreground">{a.seriesCount} série{a.seriesCount > 1 ? "s" : ""} · {a.followersCount} abonné{a.followersCount > 1 ? "s" : ""}</p>
+                    <p className="text-xs text-muted-foreground mb-1.5">
+                      {a.seriesCount} série{a.seriesCount !== 1 ? "s" : ""} · {a.followersCount} abonné{a.followersCount !== 1 ? "s" : ""}
+                    </p>
+                    {/* Score stats */}
+                    <div className="flex items-center gap-2.5 text-[10px] text-muted-foreground/80">
+                      {(a.totalReactions ?? 0) > 0 && (
+                        <span className="flex items-center gap-0.5">
+                          <Heart className="w-2.5 h-2.5 text-red-400" />{(a.totalReactions).toLocaleString("fr-FR")}
+                        </span>
+                      )}
+                      {(a.totalReads ?? 0) > 0 && (
+                        <span className="flex items-center gap-0.5">
+                          <BookOpen className="w-2.5 h-2.5" />{(a.totalReads).toLocaleString("fr-FR")}
+                        </span>
+                      )}
+                      {(a.totalViews ?? 0) > 0 && (
+                        <span className="flex items-center gap-0.5">
+                          <Eye className="w-2.5 h-2.5" />{(a.totalViews).toLocaleString("fr-FR")}
+                        </span>
+                      )}
+                      {(a.score ?? 0) > 0 && (
+                        <span className="flex items-center gap-0.5 ml-auto text-amber-500/80">
+                          <Trophy className="w-2.5 h-2.5" />{a.score.toLocaleString("fr-FR")}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </Link>
             ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            {authorsLoading ? (
-              [...Array(6)].map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)
-            ) : (
-              (topAuthors as any[])?.map((a: any) => (
-                <Link key={a.id} href={`/profile/${a.id}`} data-testid={`author-${a.id}`}>
-                  <div className="flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-accent/50 transition-colors cursor-pointer">
-                    <Avatar className="h-10 w-10">
-                      {a.avatar && <AvatarImage src={a.avatar} alt="" />}
-                      <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-                        {(a.displayName || a.username || "?").charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1">
-                        <p className="text-sm font-medium truncate">{a.displayName || a.username}</p>
-                        {a.verified && <BadgeCheck className="w-3.5 h-3.5 text-blue-500" />}
-                      </div>
-                      <p className="text-xs text-muted-foreground">{a.seriesCount} séries · {a.followersCount} abonnés</p>
-                    </div>
-                  </div>
-                </Link>
-              ))
-            )}
           </div>
         )}
       </section>

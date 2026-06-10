@@ -3,6 +3,7 @@ import { useParams, Link, useLocation } from "wouter";
 import { useGetChapter, useGetChapterComments, getGetChapterQueryKey, getGetChapterCommentsQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth-context";
 import { ReactionPicker } from "@/components/reaction-picker";
+import { AdBanner } from "@/components/ad-banner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -480,28 +481,35 @@ export default function Reader() {
         ) : mode === "scroll" ? (
           <div className="w-full">
             {pages.map((p: any, i: number) => (
-              <div
-                key={p.id ?? i}
-                className="w-full max-w-2xl mx-auto mb-2 last:mb-0"
-                data-testid={`page-${p.pageNumber}`}
-              >
-                {/* Page image — full width, no gap between image and bar */}
-                <img
-                  src={p.imageUrl}
-                  alt={`Page ${p.pageNumber}`}
-                  className="w-full block"
-                  style={{ height: "auto" }}
-                  loading={i < 3 ? "eager" : "lazy"}
-                  decoding="async"
-                />
+              <>
+                <div
+                  key={p.id ?? i}
+                  className="w-full max-w-2xl mx-auto mb-2 last:mb-0"
+                  data-testid={`page-${p.pageNumber}`}
+                >
+                  {/* Page image — full width, no gap between image and bar */}
+                  <img
+                    src={p.imageUrl}
+                    alt={`Page ${p.pageNumber}`}
+                    className="w-full block"
+                    style={{ height: "auto" }}
+                    loading={i < 3 ? "eager" : "lazy"}
+                    decoding="async"
+                  />
 
-                {/* ── Reaction bar — collée sous l'image comme Facebook ── */}
-                <PageReactionBar
-                  pageId={p.id}
-                  reactions={pageReactions[p.id]}
-                  onReact={handlePageReact}
-                />
-              </div>
+                  {/* ── Reaction bar — collée sous l'image comme Facebook ── */}
+                  <PageReactionBar
+                    pageId={p.id}
+                    reactions={pageReactions[p.id]}
+                    onReact={handlePageReact}
+                  />
+                </div>
+
+                {/* ── Pub toutes les 5 pages, uniquement sur chapitres gratuits ── */}
+                {!isPremium && (i + 1) % 5 === 0 && i < pages.length - 1 && (
+                  <AdBanner key={`ad-${i}`} slot="between-pages" />
+                )}
+              </>
             ))}
 
             {/* Chapter navigation at bottom */}

@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Eye, Layers, Grid2x2, MessageCircle, UserPlus, UserCheck, PenTool, Upload, X, Check, Loader2 } from "lucide-react";
+import { Eye, Layers, Grid2x2, MessageCircle, UserPlus, UserCheck, PenTool, Upload, X, Check, Loader2, Heart, BookOpen } from "lucide-react";
 import { ClassBadge, XpProgressBar } from "@/components/class-badge";
 import { ProfileAvatar } from "@/components/profile-avatar";
 import { useAuth } from "@/lib/auth-context";
@@ -203,8 +203,20 @@ export default function Profile() {
                 </div>
                 {p?.role === "author" && (
                   <div className="text-center">
-                    <p className="font-bold">{(p?.totalViews || 0).toLocaleString()}</p>
-                    <p className="text-xs text-muted-foreground">Vues</p>
+                    <p className="font-bold">{(p?.totalViews || 0).toLocaleString("fr-FR")}</p>
+                    <p className="text-xs text-muted-foreground flex items-center justify-center gap-0.5"><Eye className="w-3 h-3" />Vues</p>
+                  </div>
+                )}
+                {p?.role === "author" && (
+                  <div className="text-center">
+                    <p className="font-bold">{(p?.totalLikes || 0).toLocaleString("fr-FR")}</p>
+                    <p className="text-xs text-muted-foreground flex items-center justify-center gap-0.5"><Heart className="w-3 h-3" />Likes</p>
+                  </div>
+                )}
+                {p?.role === "author" && (
+                  <div className="text-center">
+                    <p className="font-bold">{(p?.totalReads || 0).toLocaleString("fr-FR")}</p>
+                    <p className="text-xs text-muted-foreground flex items-center justify-center gap-0.5"><BookOpen className="w-3 h-3" />Lectures</p>
                   </div>
                 )}
               </div>
