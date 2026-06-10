@@ -184,7 +184,8 @@ export default function Home() {
           </div>
         ) : (
           <div className="space-y-2">
-            {(latestUpdates as any[])?.map((u: any) => (
+            {(Array.isArray(latestUpdates) ? latestUpdates : []).map((manga: any) => (
+            
               <Link key={u.chapterId} href={`/read/${u.chapterId}`} data-testid={`update-${u.chapterId}`}>
                 <div className="flex items-center gap-4 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors cursor-pointer">
                   <div className="w-10 h-14 rounded bg-muted flex items-center justify-center shrink-0 overflow-hidden">
