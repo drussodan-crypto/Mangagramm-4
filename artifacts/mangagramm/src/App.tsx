@@ -69,7 +69,7 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <TooltipProvider>
-            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <WouterRouter base={import.meta.env.BASE_URL || "/"}>
               <SplashScreen show={splash} onDone={() => setSplash(false)} />
               <Navbar />
               <main>
