@@ -231,7 +231,8 @@ export default function Home() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {((featuredAuthors && featuredAuthors.length > 0 ? featuredAuthors : topAuthors) as any[])?.map((a: any, rank: number) => (  
+          {((Array.isArray(featuredAuthors) && featuredAuthors.length > 0 ? featuredAuthors : (Array.isArray(topAuthors) ? topAuthors : [])) as any[]).map((a: any, rank: number) => (
+            
           
             
               <Link key={a.id} href={`/profile/${a.id}`} data-testid={`featured-author-${a.id}`}>
