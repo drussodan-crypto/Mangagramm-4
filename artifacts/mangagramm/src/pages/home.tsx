@@ -152,7 +152,8 @@ export default function Home() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {(trending as any[])?.map((s: any) => (
+            {(Array.isArray(trending) ? trending : []).map((manga: any) => (
+            
               <SeriesCard key={s.id} {...s} />
             ))}
           </div>
